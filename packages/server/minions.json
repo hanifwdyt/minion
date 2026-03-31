@@ -1,0 +1,50 @@
+[
+  {
+    "id": "backend-dev",
+    "name": "Budi",
+    "role": "Backend Dev",
+    "color": "#4A90D9",
+    "position": [-3, 0, -3.2],
+    "workdir": "."
+  },
+  {
+    "id": "frontend-dev",
+    "name": "Sari",
+    "role": "Frontend Dev",
+    "color": "#E8564A",
+    "position": [0, 0, -3.2],
+    "workdir": "."
+  },
+  {
+    "id": "devops",
+    "name": "Andi",
+    "role": "DevOps",
+    "color": "#2ECC71",
+    "position": [3, 0, -3.2],
+    "workdir": "."
+  },
+  {
+    "id": "qa",
+    "name": "Rina",
+    "role": "QA Engineer",
+    "color": "#F39C12",
+    "position": [-3, 0, -0.2],
+    "workdir": "."
+  },
+  {
+    "id": "fullstack",
+    "name": "Dimas",
+    "role": "Fullstack Dev",
+    "color": "#9B59B6",
+    "position": [0, 0, -0.2],
+    "workdir": "."
+  },
+  {
+    "id": "architect",
+    "name": "Maya",
+    "role": "Architect",
+    "color": "#1ABC9C",
+    "position": [3, 0, -0.2],
+    "workdir": "."
+  }
+]

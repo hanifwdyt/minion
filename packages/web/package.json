@@ -1,0 +1,30 @@
+{
+  "name": "@minion/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10",
+    "@react-three/fiber": "^9",
+    "react": "^19",
+    "react-dom": "^19",
+    "socket.io-client": "^4",
+    "three": "^0.172",
+    "@xterm/xterm": "^5",
+    "@xterm/addon-fit": "^0.10",
+    "zustand": "^5"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.172",
+    "@vitejs/plugin-react": "^4",
+    "typescript": "^5",
+    "vite": "^6"
+  }
+}
