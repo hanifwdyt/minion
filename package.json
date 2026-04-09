@@ -10,7 +10,8 @@
     "build": "turbo build",
     "lint": "turbo lint"
   },
+  "packageManager": "npm@11.6.0",
   "devDependencies": {
-    "turbo": "^2"
+    "turbo": "^2.9.1"
   }
 }

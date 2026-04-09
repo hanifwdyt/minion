@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile Card</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .card {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 40px;
+      width: 320px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-8px);
+    }
+
+    .avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #e94560, #0f3460);
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      color: white;
+    }
+
+    .name {
+      color: #eee;
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .role {
+      color: #e94560;
+      font-size: 14px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .bio {
+      color: #a0a0b0;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 24px;
+    }
+
+    .stat-item {
+      color: #eee;
+    }
+
+    .stat-number {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #a0a0b0;
+      margin-top: 4px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 32px;
+      background: linear-gradient(135deg, #e94560, #0f3460);
+      color: white;
+      border: none;
+      border-radius: 25px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: opacity 0.3s ease;
+    }
+
+    .btn:hover {
+      opacity: 0.85;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="avatar">H</div>
+    <h2 class="name">Hanif Widiyanto</h2>
+    <p class="role">Software Engineer</p>
+    <p class="bio">Building cool stuff with code. Coffee-driven development enthusiast.</p>
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-number">142</div>
+        <div class="stat-label">Projects</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">3.2k</div>
+        <div class="stat-label">Commits</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">89</div>
+        <div class="stat-label">Stars</div>
+      </div>
+    </div>
+    <button class="btn">Follow</button>
+  </div>
+</body>
+</html>

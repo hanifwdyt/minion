@@ -1,90 +1,113 @@
-import { useRef } from "react";
-import * as THREE from "three";
+import {
+  SakaGuru,
+  Pillar,
+  WoodenBench,
+  LowTable,
+  WorkDesk,
+  GamelanSet,
+  BatikHanging,
+  KerisDisplay,
+  TropicalPlant,
+  HangingLantern,
+  Tikar,
+} from "./Furniture";
 
 const FLOOR_SIZE = 16;
-const WALL_HEIGHT = 4;
-const WALL_THICKNESS = 0.15;
+
+// Colors
+const TEAK_DARK = "#654321";
+const TERRACOTTA = "#CC5500";
+const FLOOR_COLOR = "#C4A882";
+const ROOF_COLOR = "#8B4513";
 
 function Floor() {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
-      <planeGeometry args={[FLOOR_SIZE, FLOOR_SIZE]} />
-      <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
-    </mesh>
+    <group>
+      {/* Main floor - polished cement / tile */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[FLOOR_SIZE, FLOOR_SIZE]} />
+        <meshStandardMaterial color={FLOOR_COLOR} roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
+function JogloRoof() {
+  return (
+    <group>
+      {/* Main roof beams connecting saka guru */}
+      {/* Front-back beams */}
+      <mesh position={[-2.5, 3.75, 0]} castShadow>
+        <boxGeometry args={[0.15, 0.15, 7]} />
+        <meshStandardMaterial color={TEAK_DARK} />
+      </mesh>
+      <mesh position={[2.5, 3.75, 0]} castShadow>
+        <boxGeometry args={[0.15, 0.15, 7]} />
+        <meshStandardMaterial color={TEAK_DARK} />
+      </mesh>
+      {/* Left-right beams */}
+      <mesh position={[0, 3.75, -3]} castShadow>
+        <boxGeometry args={[5.2, 0.15, 0.15]} />
+        <meshStandardMaterial color={TEAK_DARK} />
+      </mesh>
+      <mesh position={[0, 3.75, 3]} castShadow>
+        <boxGeometry args={[5.2, 0.15, 0.15]} />
+        <meshStandardMaterial color={TEAK_DARK} />
+      </mesh>
+
+      {/* Outer beams (lower) */}
+      {[-6.5, 6.5].map((x, i) => (
+        <mesh key={`fb-${i}`} position={[x, 2.9, 0]} castShadow>
+          <boxGeometry args={[0.12, 0.12, FLOOR_SIZE]} />
+          <meshStandardMaterial color={TEAK_DARK} />
+        </mesh>
+      ))}
+      {[-7, 7].map((z, i) => (
+        <mesh key={`lr-${i}`} position={[0, 2.9, z]} castShadow>
+          <boxGeometry args={[FLOOR_SIZE, 0.12, 0.12]} />
+          <meshStandardMaterial color={TEAK_DARK} />
+        </mesh>
+      ))}
+
+      {/* Roof removed — open top for isometric camera view */}
+    </group>
   );
 }
 
 function Walls() {
-  const wallColor = "#16213e";
+  // Joglo is open-sided (pendopo), but we add partial back walls
   return (
     <group>
-      {/* Back wall */}
-      <mesh position={[0, WALL_HEIGHT / 2, -FLOOR_SIZE / 2]} receiveShadow>
-        <boxGeometry args={[FLOOR_SIZE, WALL_HEIGHT, WALL_THICKNESS]} />
-        <meshStandardMaterial color={wallColor} />
+      {/* Back wall (partial - represents dalem/inner house) */}
+      <mesh position={[0, 1.5, -7.5]} receiveShadow>
+        <boxGeometry args={[8, 3, 0.15]} />
+        <meshStandardMaterial color="#5D4037" roughness={0.8} />
       </mesh>
-      {/* Left wall */}
-      <mesh position={[-FLOOR_SIZE / 2, WALL_HEIGHT / 2, 0]} receiveShadow>
-        <boxGeometry args={[WALL_THICKNESS, WALL_HEIGHT, FLOOR_SIZE]} />
-        <meshStandardMaterial color={wallColor} />
+      {/* Carved panel on back wall */}
+      <mesh position={[0, 1.8, -7.42]}>
+        <boxGeometry args={[3, 1.5, 0.02]} />
+        <meshStandardMaterial color={TEAK_DARK} />
+      </mesh>
+      {/* Gold carving accents */}
+      <mesh position={[0, 2.3, -7.4]}>
+        <boxGeometry args={[2.5, 0.04, 0.01]} />
+        <meshStandardMaterial color="#DAA520" metalness={0.6} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 1.3, -7.4]}>
+        <boxGeometry args={[2.5, 0.04, 0.01]} />
+        <meshStandardMaterial color="#DAA520" metalness={0.6} roughness={0.3} />
+      </mesh>
+
+      {/* Low wall / railing on sides (pendopo style) */}
+      <mesh position={[-7.5, 0.3, 0]} receiveShadow>
+        <boxGeometry args={[0.12, 0.6, FLOOR_SIZE]} />
+        <meshStandardMaterial color="#6D4C3B" roughness={0.8} />
+      </mesh>
+      <mesh position={[7.5, 0.3, 0]} receiveShadow>
+        <boxGeometry args={[0.12, 0.6, FLOOR_SIZE]} />
+        <meshStandardMaterial color="#6D4C3B" roughness={0.8} />
       </mesh>
     </group>
-  );
-}
-
-function Desk({ position }: { position: [number, number, number] }) {
-  const deskColor = "#2d3436";
-  const legColor = "#636e72";
-  const tableTop = 0.9;
-  const tableWidth = 1.8;
-  const tableDepth = 0.9;
-
-  return (
-    <group position={position}>
-      {/* Table top */}
-      <mesh position={[0, tableTop, 0]} castShadow receiveShadow>
-        <boxGeometry args={[tableWidth, 0.06, tableDepth]} />
-        <meshStandardMaterial color={deskColor} />
-      </mesh>
-      {/* Legs */}
-      {[
-        [-0.8, 0.45, -0.35],
-        [0.8, 0.45, -0.35],
-        [-0.8, 0.45, 0.35],
-        [0.8, 0.45, 0.35],
-      ].map((pos, i) => (
-        <mesh key={i} position={pos as [number, number, number]} castShadow>
-          <boxGeometry args={[0.05, 0.9, 0.05]} />
-          <meshStandardMaterial color={legColor} />
-        </mesh>
-      ))}
-      {/* Monitor */}
-      <mesh position={[0, 1.4, -0.25]} castShadow>
-        <boxGeometry args={[0.8, 0.5, 0.04]} />
-        <meshStandardMaterial color="#0f0f23" emissive="#1a1a3e" emissiveIntensity={0.3} />
-      </mesh>
-      {/* Monitor stand */}
-      <mesh position={[0, 1.1, -0.25]} castShadow>
-        <boxGeometry args={[0.06, 0.2, 0.06]} />
-        <meshStandardMaterial color={legColor} />
-      </mesh>
-      {/* Keyboard */}
-      <mesh position={[0, 0.94, 0.1]}>
-        <boxGeometry args={[0.5, 0.02, 0.18]} />
-        <meshStandardMaterial color="#2d2d2d" />
-      </mesh>
-    </group>
-  );
-}
-
-function GridFloor() {
-  const gridRef = useRef<THREE.GridHelper>(null);
-  return (
-    <gridHelper
-      ref={gridRef}
-      args={[FLOOR_SIZE, 16, "#ffffff08", "#ffffff05"]}
-      position={[0, 0.01, 0]}
-    />
   );
 }
 
@@ -93,15 +116,62 @@ export function Room() {
     <group>
       <Floor />
       <Walls />
-      <GridFloor />
+      <JogloRoof />
 
-      {/* Row of desks */}
-      <Desk position={[-3, 0, -4]} />
-      <Desk position={[0, 0, -4]} />
-      <Desk position={[3, 0, -4]} />
-      <Desk position={[-3, 0, -1]} />
-      <Desk position={[0, 0, -1]} />
-      <Desk position={[3, 0, -1]} />
+      {/* ── 4 Saka Guru (Central Pillars) ── */}
+      <SakaGuru position={[-2.5, 0, -3]} height={3.5} />
+      <SakaGuru position={[2.5, 0, -3]} height={3.5} />
+      <SakaGuru position={[-2.5, 0, 3]} height={3.5} />
+      <SakaGuru position={[2.5, 0, 3]} height={3.5} />
+
+      {/* ── Outer Pillars ── */}
+      <Pillar position={[-6.5, 0, -5.5]} />
+      <Pillar position={[-6.5, 0, 0]} />
+      <Pillar position={[-6.5, 0, 5.5]} />
+      <Pillar position={[6.5, 0, -5.5]} />
+      <Pillar position={[6.5, 0, 0]} />
+      <Pillar position={[6.5, 0, 5.5]} />
+
+      {/* ── Work Area (back — near dalem) ── */}
+      <WorkDesk position={[-4.5, 0, -6]} rotation={0} />
+      <WorkDesk position={[-1.5, 0, -6]} rotation={0} />
+      <WorkDesk position={[1.5, 0, -6]} rotation={0} />
+      <WorkDesk position={[4.5, 0, -6]} rotation={0} />
+
+      {/* ── Seating Area (center pendopo) ── */}
+      <WoodenBench position={[-4, 0, 0]} rotation={Math.PI / 2} width={2} />
+      <WoodenBench position={[4, 0, 0]} rotation={-Math.PI / 2} width={2} />
+      <LowTable position={[0, 0, 0]} />
+
+      {/* ── Tikar (woven mats) ── */}
+      <Tikar position={[0, 0, 0]} size={[3, 2.5]} />
+      <Tikar position={[-5, 0, 3]} size={[2, 1.5]} color="#B8956E" />
+
+      {/* ── Gamelan ── */}
+      <GamelanSet position={[4, 0, 4]} rotation={-Math.PI / 2} />
+
+      {/* ── Decorations ── */}
+      <BatikHanging position={[-7.4, 1.8, -2.5]} rotation={Math.PI / 2} color="#1B3A5C" />
+      <BatikHanging position={[-7.4, 1.8, 2.5]} rotation={Math.PI / 2} color="#8B1A1A" />
+
+      <KerisDisplay position={[0, 0.78, -7.35]} />
+      <KerisDisplay position={[-1.2, 0.78, -7.35]} />
+      <KerisDisplay position={[1.2, 0.78, -7.35]} />
+
+      {/* ── Plants ── */}
+      <TropicalPlant position={[-7, 0, -6.5]} />
+      <TropicalPlant position={[7, 0, -6.5]} />
+      <TropicalPlant position={[-7, 0, 6]} />
+      <TropicalPlant position={[7, 0, 6]} />
+
+      {/* ── Lanterns ── */}
+      <HangingLantern position={[-2.5, 4.5, 0]} />
+      <HangingLantern position={[2.5, 4.5, 0]} />
+      <HangingLantern position={[0, 4.5, -3]} />
+      <HangingLantern position={[0, 4.5, 3]} />
+
+      {/* ── Extra bench at front ── */}
+      <WoodenBench position={[0, 0, 5.5]} width={2.5} />
     </group>
   );
 }

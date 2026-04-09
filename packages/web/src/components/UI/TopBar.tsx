@@ -1,20 +1,23 @@
+import { useState } from "react";
 import { useStore } from "../../store";
+import { MuteButton } from "./AudioManager";
 
 export function TopBar() {
-  const { minions } = useStore();
+  const { minions, connected, selectedMinionId, selectMinion, activityOpen, setActivityOpen, setDashboardOpen, cameraMode, setCameraMode } = useStore();
   const workingCount = minions.filter((m) => m.status === "working").length;
+  const isBalaiSelected = selectedMinionId === "balai";
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div
+    <header
+      role="banner"
       style={{
         position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
+        top: 0, left: 0, right: 0,
         height: "48px",
-        background: "rgba(10, 10, 15, 0.85)",
-        backdropFilter: "blur(8px)",
-        borderBottom: "1px solid #1a1a3e",
+        background: "rgba(93, 64, 55, 0.92)",
+        backdropFilter: "blur(12px)",
+        borderBottom: "2px solid #DAA520",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -23,51 +26,177 @@ export function TopBar() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <span style={{ fontSize: "20px" }}>🤖</span>
-        <span style={{ fontWeight: 800, fontSize: "16px", letterSpacing: "-0.5px" }}>
-          MINION
+        <span style={{ fontSize: "20px" }} aria-hidden="true">🎭</span>
+        <span style={{ fontWeight: 800, fontSize: "16px", letterSpacing: "1px", color: "#FFE0B2" }}>
+          PUNAKAWAN
         </span>
-        <span style={{ fontSize: "11px", color: "#666", fontWeight: 500 }}>
-          AI Agent Workspace
+        <span style={{ fontSize: "11px", color: "#BCAAA4", fontWeight: 500 }} className="hide-mobile">
+          Agen AI Nusantara
         </span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        {/* Minion status dots */}
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMenuOpen(!menuOpen)}
+        aria-label="Toggle menu"
+        aria-expanded={menuOpen}
+        style={{
+          display: "none",
+          background: "none", border: "none", color: "#FFE0B2",
+          fontSize: "20px", cursor: "pointer", padding: "4px 8px",
+        }}
+        className="show-mobile-only"
+      >
+        ☰
+      </button>
+
+      <nav
+        role="navigation"
+        aria-label="Main navigation"
+        className="top-bar-buttons"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+        }}
+      >
+        {/* Audio + Camera */}
+        <MuteButton />
+        <button
+          onClick={() => setCameraMode(cameraMode === "overview" ? "follow" : "overview")}
+          aria-label={cameraMode === "follow" ? "Switch to overview camera" : "Switch to follow camera"}
+          style={iconBtnStyle(cameraMode === "follow")}
+        >
+          {cameraMode === "follow" ? "🎯" : "🎥"}
+        </button>
+
+        {/* Dashboard */}
+        <button
+          onClick={() => setDashboardOpen(true)}
+          aria-label="Open dashboard"
+          style={iconBtnStyle(false)}
+        >
+          ⚙️
+        </button>
+
+        {/* Activity feed toggle */}
+        <button
+          onClick={() => setActivityOpen(!activityOpen)}
+          aria-label={activityOpen ? "Close activity feed" : "Open activity feed"}
+          style={iconBtnStyle(activityOpen)}
+        >
+          📋
+        </button>
+
+        {/* Balai Desa button */}
+        <button
+          onClick={() => selectMinion("balai")}
+          aria-label="Open Balai Desa shared channel"
+          aria-pressed={isBalaiSelected}
+          style={{
+            background: isBalaiSelected ? "rgba(218,165,32,0.3)" : "rgba(255,255,255,0.1)",
+            border: isBalaiSelected ? "2px solid #DAA520" : "2px solid transparent",
+            borderRadius: "14px",
+            padding: "3px 12px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            color: "#FFE0B2",
+            fontSize: "11px",
+            fontWeight: 700,
+            transition: "all 0.2s",
+            minHeight: "32px",
+          }}
+        >
+          <span aria-hidden="true">🏛</span>
+          <span className="hide-mobile">Balai Desa</span>
+        </button>
+
+        {/* Minion avatars */}
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }} role="group" aria-label="Minion selection">
           {minions.map((m) => (
-            <div
+            <button
               key={m.id}
-              title={`${m.name} - ${m.status}`}
+              onClick={() => selectMinion(m.id)}
+              aria-label={`${m.name} — ${m.status}`}
+              aria-pressed={selectedMinionId === m.id}
               style={{
-                width: 8,
-                height: 8,
+                width: 30,
+                height: 30,
                 borderRadius: "50%",
-                background:
+                background: m.color,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#FFE0B2",
+                fontSize: "11px",
+                fontWeight: 700,
+                cursor: "pointer",
+                border:
                   m.status === "working"
-                    ? "#2ecc71"
-                    : m.status === "error"
-                    ? "#e74c3c"
-                    : "#444",
-                transition: "background 0.3s",
-                boxShadow: m.status === "working" ? "0 0 6px #2ecc71" : "none",
+                    ? "2px solid #FFD54F"
+                    : selectedMinionId === m.id
+                    ? "2px solid #FFE0B2"
+                    : "2px solid transparent",
+                boxShadow: m.status === "working" ? "0 0 8px rgba(255,213,79,0.5)" : "none",
+                transition: "all 0.3s",
+                padding: 0,
               }}
-            />
+            >
+              {m.name?.[0] || "?"}
+              <span className="sr-only">{m.name} — {m.status}</span>
+            </button>
           ))}
         </div>
 
-        {workingCount > 0 && (
+        {!connected && (
           <span
+            role="alert"
             style={{
-              fontSize: "12px",
-              color: "#2ecc71",
-              fontWeight: 600,
+              fontSize: "12px", color: "#EF5350", fontWeight: 600,
+              background: "rgba(239,83,80,0.15)",
+              padding: "2px 10px", borderRadius: "10px",
+              border: "1px solid rgba(239,83,80,0.3)",
+              animation: "pulse 2s infinite",
             }}
           >
-            {workingCount} working
+            Reconnecting...
           </span>
         )}
-      </div>
-    </div>
+
+        {workingCount > 0 && (
+          <span
+            aria-live="polite"
+            style={{
+              fontSize: "12px", color: "#FFD54F", fontWeight: 600,
+              background: "rgba(255,213,79,0.15)",
+              padding: "2px 10px", borderRadius: "10px",
+              border: "1px solid rgba(255,213,79,0.3)",
+            }}
+          >
+            {workingCount} nyambut gawe
+          </span>
+        )}
+      </nav>
+    </header>
   );
+}
+
+function iconBtnStyle(active: boolean): React.CSSProperties {
+  return {
+    background: active ? "rgba(218,165,32,0.3)" : "rgba(255,255,255,0.1)",
+    border: active ? "2px solid #DAA520" : "2px solid transparent",
+    borderRadius: "14px",
+    padding: "3px 10px",
+    cursor: "pointer",
+    color: "#FFE0B2",
+    fontSize: "14px",
+    transition: "all 0.2s",
+    minWidth: "32px",
+    minHeight: "32px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
 }

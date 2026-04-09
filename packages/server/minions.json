@@ -1,50 +1,78 @@
 [
   {
-    "id": "backend-dev",
-    "name": "Budi",
-    "role": "Backend Dev",
-    "color": "#4A90D9",
-    "position": [-3, 0, -3.2],
+    "id": "semar",
+    "name": "Semar",
+    "role": "Tetua Bijak",
+    "soul": "souls/semar.md",
+    "color": "#DAA520",
+    "allowedTools": "Read,Edit,Bash,Glob,Grep,Write,WebSearch,WebFetch",
+    "maxTurns": 100,
+    "skills": ["architecture", "planning", "mentoring", "code-review", "decision-making"],
+    "outfit": {
+      "shirtColor": "#8B6914",
+      "pantsColor": "#654321",
+      "skinColor": "#1a1a1a",
+      "hatStyle": "none",
+      "hatColor": "",
+      "shoeColor": "#3E2723"
+    },
     "workdir": "."
   },
   {
-    "id": "frontend-dev",
-    "name": "Sari",
-    "role": "Frontend Dev",
-    "color": "#E8564A",
-    "position": [0, 0, -3.2],
+    "id": "gareng",
+    "name": "Gareng",
+    "role": "Sang Pemikir",
+    "soul": "souls/gareng.md",
+    "color": "#CC5500",
+    "allowedTools": "Read,Grep,Glob,Bash,LSP",
+    "maxTurns": 80,
+    "skills": ["debugging", "code-review", "testing", "analysis", "research"],
+    "outfit": {
+      "shirtColor": "#CC5500",
+      "pantsColor": "#5D4037",
+      "skinColor": "#1a1a1a",
+      "hatStyle": "none",
+      "hatColor": "",
+      "shoeColor": "#3E2723"
+    },
     "workdir": "."
   },
   {
-    "id": "devops",
-    "name": "Andi",
-    "role": "DevOps",
-    "color": "#2ECC71",
-    "position": [3, 0, -3.2],
+    "id": "petruk",
+    "name": "Petruk",
+    "role": "Sang Penghibur",
+    "soul": "souls/petruk.md",
+    "color": "#8B1A1A",
+    "allowedTools": "Read,Edit,Write,Bash,Glob,Grep,WebSearch",
+    "maxTurns": 60,
+    "skills": ["frontend", "ui-design", "prototyping", "creative-coding", "feature-building"],
+    "outfit": {
+      "shirtColor": "#8B1A1A",
+      "pantsColor": "#4E342E",
+      "skinColor": "#1a1a1a",
+      "hatStyle": "none",
+      "hatColor": "",
+      "shoeColor": "#3E2723"
+    },
     "workdir": "."
   },
   {
-    "id": "qa",
-    "name": "Rina",
-    "role": "QA Engineer",
-    "color": "#F39C12",
-    "position": [-3, 0, -0.2],
-    "workdir": "."
-  },
-  {
-    "id": "fullstack",
-    "name": "Dimas",
-    "role": "Fullstack Dev",
-    "color": "#9B59B6",
-    "position": [0, 0, -0.2],
-    "workdir": "."
-  },
-  {
-    "id": "architect",
-    "name": "Maya",
-    "role": "Architect",
-    "color": "#1ABC9C",
-    "position": [3, 0, -0.2],
+    "id": "bagong",
+    "name": "Bagong",
+    "role": "Sang Pekerja",
+    "soul": "souls/bagong.md",
+    "color": "#1B5E20",
+    "allowedTools": "Read,Edit,Write,Bash,Glob,Grep",
+    "maxTurns": 30,
+    "skills": ["refactoring", "cleanup", "deployment", "scripting", "quick-fix"],
+    "outfit": {
+      "shirtColor": "#1B5E20",
+      "pantsColor": "#3E2723",
+      "skinColor": "#1a1a1a",
+      "hatStyle": "none",
+      "hatColor": "",
+      "shoeColor": "#3E2723"
+    },
     "workdir": "."
   }
 ]

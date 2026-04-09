@@ -1,0 +1,28 @@
+{
+  "byMinion": {
+    "semar": {
+      "totalTasks": 2,
+      "completedTasks": 1,
+      "failedTasks": 1,
+      "totalTokensInput": 3,
+      "totalTokensOutput": 71,
+      "totalCost": 0.001074,
+      "totalDurationMs": 223185,
+      "toolCallCounts": {
+        "Agent": 1,
+        "Bash": 14,
+        "Read": 31,
+        "Grep": 1,
+        "ToolSearch": 1,
+        "TodoWrite": 1,
+        "Edit": 1
+      },
+      "loopDetections": 0
+    }
+  },
+  "delegations": {
+    "total": 0,
+    "byMinion": {}
+  },
+  "lastUpdated": 1775029734487
+}

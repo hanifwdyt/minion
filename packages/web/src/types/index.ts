@@ -1,9 +1,18 @@
+export interface MinionOutfit {
+  shirtColor: string;
+  pantsColor: string;
+  skinColor: string;
+  hatStyle: "none" | "cap" | "beanie" | "headphones";
+  hatColor: string;
+  shoeColor: string;
+}
+
 export interface MinionConfig {
   id: string;
   name: string;
   role: string;
   color: string;
-  position: [number, number, number];
+  outfit: MinionOutfit;
   workdir: string;
 }
 
@@ -11,8 +20,11 @@ export interface MinionState extends MinionConfig {
   status: "idle" | "working" | "error";
 }
 
-export interface ClaudeOutput {
+export interface ChatMessage {
+  id: string;
   minionId: string;
-  type: "text" | "tool" | "error" | "system";
-  data: string;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  timestamp: number;
+  toolName?: string;
 }

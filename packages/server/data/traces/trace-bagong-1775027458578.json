@@ -1,0 +1,15 @@
+{
+  "id": "trace-bagong-1775027458578",
+  "minionId": "bagong",
+  "prompt": "enak siang makan apa ya gong",
+  "startedAt": 1775027458578,
+  "status": "failed",
+  "steps": [],
+  "tokenUsage": {
+    "input": 0,
+    "output": 0
+  },
+  "cost": 0,
+  "loopDetections": 0,
+  "completedAt": 1775027468891
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "bagong-1-1775007946276",
+    "minionId": "bagong",
+    "role": "assistant",
+    "content": "Yo. Gue Bagong. Laper nih sebenernya tapi ya udah lah, mau ngomong apa?\n\nKalo mau nanya soal kode, langsung aja. Kalo mau basa-basi... ya boleh sih, tapi gue jawabnya pendek-pendek. Efisiensi.\n\nMau mulai dari mana?",
+    "timestamp": 1775007946276
+  },
+  {
+    "id": "bagong-1-1775021085809",
+    "minionId": "bagong",
+    "role": "assistant",
+    "content": "\n\nHalo! Ada yang bisa gue bantu?",
+    "timestamp": 1775021085809
+  },
+  {
+    "id": "user-1775027458541",
+    "minionId": "bagong",
+    "role": "user",
+    "content": "enak siang makan apa ya gong",
+    "timestamp": 1775027458541
+  },
+  {
+    "id": "user-1775027495483",
+    "minionId": "bagong",
+    "role": "user",
+    "content": "bales",
+    "timestamp": 1775027495483
+  }
+]

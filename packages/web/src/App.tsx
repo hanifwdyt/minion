@@ -2,55 +2,83 @@ import { Canvas } from "@react-three/fiber";
 import { Room } from "./components/Scene/Room";
 import { Minion } from "./components/Scene/Minion";
 import { IsometricCamera } from "./components/Scene/IsometricCamera";
+import { DayNightCycle, MinionParticles } from "./components/Scene/SceneEffects";
 import { SidePanel } from "./components/Panel/SidePanel";
 import { TopBar } from "./components/UI/TopBar";
+import { ErrorBoundary } from "./components/UI/ErrorBoundary";
+import { ActivityFeed } from "./components/Panel/ActivityFeed";
+import { lazy, Suspense } from "react";
+const Dashboard = lazy(() => import("./components/Dashboard/Dashboard").then((m) => ({ default: m.Dashboard })));
+import { AudioManager } from "./components/UI/AudioManager";
+import { Toaster } from "./components/UI/Toaster";
 import { useSocket } from "./hooks/useSocket";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useNotifications } from "./hooks/useNotifications";
 import { useStore } from "./store";
 
+const START_POSITIONS: Record<string, [number, number]> = {
+  semar: [-2, 1],
+  gareng: [3, -2],
+  petruk: [-4, 4],
+  bagong: [2, 3],
+};
+
 export default function App() {
-  const { socket, sendPrompt, stopMinion } = useSocket();
-  const { minions, selectMinion } = useStore();
+  const { sendPrompt, stopMinion, clearMinionChat } = useSocket();
+  useKeyboardShortcuts();
+  useNotifications();
+  const { minions, selectMinion, activityEvents, activityOpen, setActivityOpen, dashboardOpen, setDashboardOpen, connected } = useStore();
 
   return (
     <div style={{ width: "100%", height: "100vh" }}>
       <TopBar />
+      <AudioManager />
+      <Toaster />
 
+      <ErrorBoundary label="3D Scene">
       <Canvas
         shadows
-        style={{ background: "#0a0a12" }}
-        camera={{ position: [12, 10, 12], fov: 35 }}
+        style={{ background: "#D7CCC8" }}
+        camera={{ position: [14, 11, 14], fov: 35 }}
         onPointerMissed={() => selectMinion(null)}
       >
-        <ambientLight intensity={0.3} />
-        <directionalLight
-          position={[8, 12, 8]}
-          intensity={1}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-left={-12}
-          shadow-camera-right={12}
-          shadow-camera-top={12}
-          shadow-camera-bottom={-12}
-        />
-        <pointLight position={[-4, 6, 2]} intensity={0.3} color="#7c3aed" />
-        <pointLight position={[4, 6, -4]} intensity={0.2} color="#3498db" />
+        {/* Dynamic day/night lighting */}
+        <DayNightCycle />
 
-        <fog attach="fog" args={["#0a0a12", 15, 35]} />
+        <fog attach="fog" args={["#D7CCC8", 22, 45]} />
+        <color attach="background" args={["#D7CCC8"]} />
 
         <IsometricCamera />
         <Room />
 
         {minions.map((minion) => (
-          <Minion key={minion.id} minion={minion} />
+          <Minion
+            key={minion.id}
+            minion={minion}
+            startPosition={START_POSITIONS[minion.id] || [0, 0]}
+          />
         ))}
-      </Canvas>
 
-      <SidePanel
-        socket={socket}
-        onSendPrompt={sendPrompt}
-        onStop={stopMinion}
+        {/* Particle effects */}
+        <MinionParticles />
+      </Canvas>
+      </ErrorBoundary>
+
+      <ErrorBoundary label="Chat Panel">
+        <SidePanel onSendPrompt={sendPrompt} onStop={stopMinion} onClearChat={clearMinionChat} />
+      </ErrorBoundary>
+
+      <ActivityFeed
+        events={activityEvents}
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
       />
+
+      {dashboardOpen && (
+        <Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFE0B2", fontSize: 16 }}>Loading dashboard...</div>}>
+          <Dashboard onClose={() => setDashboardOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

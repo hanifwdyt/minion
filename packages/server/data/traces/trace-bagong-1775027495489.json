@@ -1,0 +1,15 @@
+{
+  "id": "trace-bagong-1775027495489",
+  "minionId": "bagong",
+  "prompt": "bales",
+  "startedAt": 1775027495489,
+  "status": "failed",
+  "steps": [],
+  "tokenUsage": {
+    "input": 0,
+    "output": 0
+  },
+  "cost": 0,
+  "loopDetections": 0,
+  "completedAt": 1775027497628
+}

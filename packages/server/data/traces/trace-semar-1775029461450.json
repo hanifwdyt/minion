@@ -1,0 +1,15 @@
+{
+  "id": "trace-semar-1775029461450",
+  "minionId": "semar",
+  "prompt": "halo guys",
+  "startedAt": 1775029461450,
+  "status": "completed",
+  "steps": [],
+  "tokenUsage": {
+    "input": 3,
+    "output": 71
+  },
+  "cost": 0.001074,
+  "loopDetections": 0,
+  "completedAt": 1775029471898
+}
