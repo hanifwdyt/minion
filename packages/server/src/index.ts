@@ -903,6 +903,15 @@ function shutdown(signal: string) {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
+// --- Serve frontend static files ---
+const webDistPath = resolve(import.meta.dirname, "../../web/dist");
+app.use(express.static(webDistPath));
+app.get("*", (_req, res, next) => {
+  // Only serve index.html for non-API routes
+  if (_req.path.startsWith("/api/")) return next();
+  res.sendFile(resolve(webDistPath, "index.html"));
+});
+
 // --- Start ---
 const telegramBot = new TelegramBot(claude, configStore, vpnManager, memoryStore);
 const slackBot = new SlackBot(claude, configStore);
