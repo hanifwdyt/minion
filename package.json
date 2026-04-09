@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "start": "node packages/server/dist/index.js",
     "lint": "turbo lint"
   },
   "packageManager": "npm@11.6.0",
