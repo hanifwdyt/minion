@@ -5,3 +5,6 @@ dist/
 .env
 .env.local
 .DS_Store
+
+# Config contains runtime secrets — use config.example.json as template
+packages/server/config.json

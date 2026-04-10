@@ -155,10 +155,41 @@ export class ConfigStore {
     return parts.length > 0 ? parts.join("\n") : undefined;
   }
 
-  // --- Integrations ---
+  // --- Integrations (with env var overrides for secrets) ---
 
   getIntegrations(): AppConfig["integrations"] {
-    return this.config.integrations;
+    const integrations = { ...this.config.integrations };
+
+    // Override secrets from env vars if set
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      integrations.telegram = { ...integrations.telegram, token: process.env.TELEGRAM_BOT_TOKEN };
+    }
+    if (process.env.GITLAB_TOKEN) {
+      integrations.gitlab = { ...integrations.gitlab, apiToken: process.env.GITLAB_TOKEN };
+    }
+    if (process.env.GITLAB_WEBHOOK_SECRET) {
+      integrations.gitlab = { ...integrations.gitlab, webhookSecret: process.env.GITLAB_WEBHOOK_SECRET };
+    }
+    if (process.env.GITLAB_HOST) {
+      integrations.gitlab = { ...integrations.gitlab, instanceURL: `https://${process.env.GITLAB_HOST}` };
+    }
+    if (process.env.GITHUB_WEBHOOK_SECRET) {
+      integrations.github = { ...integrations.github, webhookSecret: process.env.GITHUB_WEBHOOK_SECRET };
+    }
+    if (process.env.SLACK_BOT_TOKEN) {
+      integrations.slack = { ...integrations.slack, botToken: process.env.SLACK_BOT_TOKEN };
+    }
+    if (process.env.SLACK_SIGNING_SECRET) {
+      integrations.slack = { ...integrations.slack, signingSecret: process.env.SLACK_SIGNING_SECRET };
+    }
+    if (process.env.SLACK_APP_TOKEN) {
+      integrations.slack = { ...integrations.slack, appToken: process.env.SLACK_APP_TOKEN };
+    }
+    if (process.env.WEBHOOK_SECRET) {
+      integrations.webhook = { ...integrations.webhook, secret: process.env.WEBHOOK_SECRET };
+    }
+
+    return integrations;
   }
 
   updateIntegrations(updates: Partial<AppConfig["integrations"]>): void {
@@ -166,10 +197,22 @@ export class ConfigStore {
     this.save();
   }
 
-  // --- Auth ---
+  // --- Auth (with env var overrides for secrets) ---
 
   getAuth(): AppConfig["auth"] {
-    return this.config.auth;
+    const auth = { ...this.config.auth };
+
+    if (process.env.JWT_SECRET) {
+      auth.jwtSecret = process.env.JWT_SECRET;
+    }
+    if (process.env.ADMIN_USER) {
+      auth.adminUser = process.env.ADMIN_USER;
+    }
+    if (process.env.ADMIN_PASS) {
+      auth.adminPass = process.env.ADMIN_PASS;
+    }
+
+    return auth;
   }
 
   updateAuth(updates: Partial<AppConfig["auth"]>): void {

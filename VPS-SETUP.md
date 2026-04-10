@@ -1,9 +1,13 @@
 # Punakawan VPS Setup Guide
 
+> **SECURITY NOTE:** Jangan pernah commit credentials (tokens, passwords, API keys) ke repo ini.
+> Semua secrets harus disimpan di file `.env` (yang sudah di-`.gitignore`).
+> File ini hanya berisi placeholder — ganti `YOUR_*` values dengan credentials asli di VPS langsung.
+
 ## Prerequisites
-- VPS: `77.42.43.106` (ubuntu-8gb-hel1-1)
-- SSH: `ssh -o IdentitiesOnly=yes -i /tmp/coolify_key root@77.42.43.106`
-- Domain: `punakawan.hanif.app` (DNS udah pointing)
+- VPS: `YOUR_VPS_IP` (ubuntu-8gb)
+- SSH: `ssh -o IdentitiesOnly=yes -i /path/to/key root@YOUR_VPS_IP`
+- Domain: `YOUR_DOMAIN` (DNS udah pointing)
 
 ---
 
@@ -31,7 +35,7 @@ sudo apt install -y git curl jq openconnect
 
 ```bash
 # Set OAuth token (persist di bashrc)
-echo 'export CLAUDE_CODE_OAUTH_TOKEN="sk-ant-oat01-Bl0UwAcL5iapi1gXnpUtosbyJ5Q8cGRrhcKIIN5xN0MeB0stKakfiNDMsYickA9cxLDCoxZvUyhVDS1IqoZFBA-vCHf9QAA"' >> ~/.bashrc
+echo 'export CLAUDE_CODE_OAUTH_TOKEN="your-claude-oauth-token-here"' >> ~/.bashrc
 source ~/.bashrc
 
 # Test
@@ -43,7 +47,7 @@ claude -p "say hello" --output-format text
 ```bash
 # Password file
 sudo mkdir -p /etc/openconnect
-echo "Hn42515@#D" | sudo tee /etc/openconnect/password.txt
+echo "your-vpn-password-here" | sudo tee /etc/openconnect/password.txt
 sudo chmod 600 /etc/openconnect/password.txt
 
 # Service file
@@ -55,7 +59,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/openconnect --user=LCS-HANWID --authgroup=sslgroup-users --passwd-on-stdin --no-dtls --no-deflate securevpn.indosatooredoo.com
+ExecStart=/usr/sbin/openconnect --user=YOUR_VPN_USER --authgroup=YOUR_AUTH_GROUP --passwd-on-stdin --no-dtls --no-deflate YOUR_VPN_SERVER
 ExecStop=/bin/kill -INT $MAINPID
 Restart=no
 StandardInput=file:/etc/openconnect/password.txt
@@ -67,7 +71,7 @@ EOF
 sudo systemctl daemon-reload
 
 # DNS for internal GitLab
-echo "10.49.178.251 mygitlab-dev.ioh.co.id" | sudo tee -a /etc/hosts
+echo "YOUR_GITLAB_IP YOUR_GITLAB_HOST" | sudo tee -a /etc/hosts
 ```
 
 ## Step 4: Setup glab (GitLab CLI)
@@ -78,7 +82,7 @@ sudo systemctl start openconnect
 # ⚠️ Approve Silverfort di HP!
 
 # Auth glab
-glab auth login --hostname mygitlab-dev.ioh.co.id
+glab auth login --hostname YOUR_GITLAB_HOST
 # Pilih: Token → paste Personal Access Token
 # Protocol: HTTPS
 # Authenticate Git: Yes
@@ -111,7 +115,7 @@ sudo systemctl start openconnect
 
 # Clone target repos (ganti dengan repo yang lo mau)
 cd /root/repos
-glab repo clone cco/cmo/group-digital-coe/div-smb-digital-product/ide-phoenix
+glab repo clone your-group/your-project
 # tambah repo lain sesuai kebutuhan...
 
 # Disconnect VPN
@@ -135,11 +139,11 @@ cat > packages/server/config-override.json << 'CONF'
     "gitlab": {
       "enabled": true,
       "webhookSecret": "",
-      "instanceURL": "https://mygitlab-dev.ioh.co.id",
+      "instanceURL": "https://YOUR_GITLAB_HOST",
       "apiToken": "YOUR_GITLAB_PERSONAL_ACCESS_TOKEN",
       "defaultReviewer": "gareng",
       "mode": "poll",
-      "projects": ["cco/cmo/group-digital-coe/div-smb-digital-product/ide-phoenix"]
+      "projects": ["your-group/your-project"]
     }
   }
 }
@@ -152,7 +156,7 @@ CONF
 3. Copy token → paste di config di atas
 
 ### GitLab Personal Access Token
-1. Buka `https://mygitlab-dev.ioh.co.id/-/user_settings/personal_access_tokens` (perlu VPN)
+1. Buka `https://YOUR_GITLAB_HOST/-/user_settings/personal_access_tokens` (perlu VPN)
 2. Create token dengan scope: `api`, `read_repository`, `write_repository`
 3. Copy → paste di config di atas
 
@@ -162,7 +166,7 @@ CONF
 cat > /root/minion/.env << 'EOF'
 PORT=3001
 REPOS_BASE=/root/repos
-CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-Bl0UwAcL5iapi1gXnpUtosbyJ5Q8cGRrhcKIIN5xN0MeB0stKakfiNDMsYickA9cxLDCoxZvUyhVDS1IqoZFBA-vCHf9QAA
+CLAUDE_CODE_OAUTH_TOKEN=your-claude-oauth-token-here
 EOF
 ```
 
@@ -187,7 +191,7 @@ pm2 monit                 # Monitor realtime
 
 ## Step 9: Reverse Proxy (optional, buat Web UI)
 
-Kalo mau akses Web UI via `punakawan.hanif.app`, setup Caddy/Nginx reverse proxy:
+Kalo mau akses Web UI via `YOUR_DOMAIN`, setup Caddy/Nginx reverse proxy:
 
 ```bash
 # Install Caddy
@@ -195,7 +199,7 @@ sudo apt install -y caddy
 
 # Config
 sudo tee /etc/caddy/Caddyfile << 'EOF'
-punakawan.hanif.app {
+YOUR_DOMAIN {
     reverse_proxy localhost:3001
 }
 EOF
@@ -238,7 +242,7 @@ claude -p "say hi" --output-format text
 sudo systemctl status openconnect
 
 # Cek connectivity
-curl -sk -o /dev/null -w "%{http_code}" https://mygitlab-dev.ioh.co.id
+curl -sk -o /dev/null -w "%{http_code}" https://YOUR_GITLAB_HOST
 
 # Logs
 sudo journalctl -u openconnect --since "5 min ago"
