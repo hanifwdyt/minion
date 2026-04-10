@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { useStore } from "../../store";
 import { MuteButton } from "./AudioManager";
 import { colors, fonts, fontSize, shadows, transition, glass, radius } from "../../styles/tokens";
+import {
+  IconPunakawan, IconSun, IconMoon,
+  IconCrosshair, IconCamera, IconSettings,
+  IconActivity, IconBalai,
+} from "./Icons";
 
 const API = "/api";
 
@@ -56,10 +61,10 @@ export function TopBar() {
           borderRadius: radius.md,
           background: `linear-gradient(135deg, ${colors.gold}, ${colors.goldDim})`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 14,
           boxShadow: shadows.glow,
+          color: colors.bg,
         }}>
-          🎭
+          <IconPunakawan size={16} />
         </div>
         <div>
           <span style={{
@@ -92,29 +97,33 @@ export function TopBar() {
           disabled={breathLoading}
           active={breathEnabled}
           label={breathEnabled ? "Breath ON" : "Breath OFF"}
-          icon={breathEnabled ? "☀️" : "🌙"}
-        />
+        >
+          {breathEnabled ? <IconSun size={14} /> : <IconMoon size={14} />}
+        </IconBtn>
 
         <IconBtn
           onClick={() => setCameraMode(cameraMode === "overview" ? "follow" : "overview")}
           active={cameraMode === "follow"}
           label={cameraMode === "follow" ? "Overview camera" : "Follow camera"}
-          icon={cameraMode === "follow" ? "🎯" : "🎥"}
-        />
+        >
+          {cameraMode === "follow" ? <IconCrosshair size={14} /> : <IconCamera size={14} />}
+        </IconBtn>
 
         <IconBtn
           onClick={() => setDashboardOpen(true)}
           active={false}
           label="Dashboard"
-          icon="⚙️"
-        />
+        >
+          <IconSettings size={14} />
+        </IconBtn>
 
         <IconBtn
           onClick={() => setActivityOpen(!activityOpen)}
           active={activityOpen}
           label="Activity"
-          icon="📋"
-        />
+        >
+          <IconActivity size={14} />
+        </IconBtn>
 
         {/* Divider */}
         <div style={{ width: 1, height: 24, background: colors.glassBorder, margin: "0 4px" }} />
@@ -146,7 +155,8 @@ export function TopBar() {
             if (!isBalaiSelected) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
           }}
         >
-          🏛 <span className="hide-mobile">Balai</span>
+          <IconBalai size={13} />
+          <span className="hide-mobile">Balai</span>
         </button>
 
         {/* Minion Avatars */}
@@ -240,12 +250,13 @@ export function TopBar() {
   );
 }
 
-function IconBtn({ onClick, active, label, icon, disabled }: {
+function IconBtn({ onClick, active, label, icon, disabled, children }: {
   onClick: () => void;
   active: boolean;
   label: string;
-  icon: string;
+  icon?: string;
   disabled?: boolean;
+  children?: React.ReactNode;
 }) {
   return (
     <button
@@ -281,7 +292,7 @@ function IconBtn({ onClick, active, label, icon, disabled }: {
         }
       }}
     >
-      {icon}
+      {children ?? icon}
     </button>
   );
 }

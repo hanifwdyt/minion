@@ -198,7 +198,7 @@ export class BreathEngine {
 
         this.claude.runPrompt("semar", breathPrompt, workdir, {
           systemPrompt: semarSoul || undefined,
-          allowedTools: "Read,Bash,Glob,Grep,Write",
+          allowedTools: "Read,Bash,Glob,Grep,Write,WebFetch,WebSearch",
           maxTurns: 20,
         });
       });

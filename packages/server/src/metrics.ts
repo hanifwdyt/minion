@@ -10,6 +10,7 @@ interface MinionMetrics {
   totalTasks: number;
   completedTasks: number;
   failedTasks: number;
+  conversations: number;  // pure chat exchanges with 0 tool calls
   totalTokensInput: number;
   totalTokensOutput: number;
   totalCost: number;
@@ -26,7 +27,7 @@ interface MetricsData {
 
 function emptyMinionMetrics(): MinionMetrics {
   return {
-    totalTasks: 0, completedTasks: 0, failedTasks: 0,
+    totalTasks: 0, completedTasks: 0, failedTasks: 0, conversations: 0,
     totalTokensInput: 0, totalTokensOutput: 0, totalCost: 0,
     totalDurationMs: 0, toolCallCounts: {}, loopDetections: 0,
   };
@@ -59,6 +60,15 @@ export class MetricsStore {
     loopDetections: number;
   }) {
     const m = this.getMinion(minionId);
+    const toolCallCount = Object.values(result.toolCalls).reduce((a, b) => a + b, 0);
+
+    // Pure conversation: 0 tool calls + finished quickly → don't count as task
+    if (toolCallCount === 0 && result.durationMs < 10_000) {
+      m.conversations = (m.conversations || 0) + 1;
+      this.save();
+      return;
+    }
+
     m.totalTasks++;
     if (result.status === "completed") m.completedTasks++;
     else m.failedTasks++;
@@ -86,6 +96,7 @@ export class MetricsStore {
         completionRate: m.totalTasks > 0 ? (m.completedTasks / m.totalTasks * 100).toFixed(1) + "%" : "N/A",
         avgDurationMs: m.totalTasks > 0 ? Math.round(m.totalDurationMs / m.totalTasks) : 0,
         avgCost: m.totalTasks > 0 ? (m.totalCost / m.totalTasks).toFixed(4) : "0",
+        conversations: m.conversations || 0,
       };
     }
     return { ...this.data, computed };

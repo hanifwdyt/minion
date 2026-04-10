@@ -102,5 +102,60 @@
     ],
     "id": "mem-1775803566265-g8o2",
     "timestamp": 1775803566265
+  },
+  {
+    "minionId": "semar",
+    "type": "episodic",
+    "content": "Completed task with 11 tool calls",
+    "context": "apa yg bisa diimprove ya?",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775806881189-38az",
+    "timestamp": 1775806881189
+  },
+  {
+    "minionId": "semar",
+    "type": "episodic",
+    "content": "Completed task with 15 tool calls",
+    "context": "oke sekarang no 2. ini karena ga masuk ke db keknya deh. soalnya ilang token tracking nya tiap restart",
+    "outcome": "success",
+    "tags": [
+      "Glob",
+      "Grep",
+      "Read",
+      "Edit",
+      "Bash"
+    ],
+    "id": "mem-1775807176164-06g9",
+    "timestamp": 1775807176164
+  },
+  {
+    "minionId": "semar",
+    "type": "episodic",
+    "content": "Completed task with 8 tool calls",
+    "context": "selanjutnya apa tadi ya",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775807340733-dzp4",
+    "timestamp": 1775807340733
+  },
+  {
+    "minionId": "semar",
+    "type": "episodic",
+    "content": "Completed task with 30 tool calls",
+    "context": "u bisa ubah icon icon di web ini jangan pake emoji icon ga tapi pake svg. sekelas awwwards",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit"
+    ],
+    "id": "mem-1775807631868-8dhm",
+    "timestamp": 1775807631868
   }
 ]

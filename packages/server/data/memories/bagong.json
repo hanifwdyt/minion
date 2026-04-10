@@ -24,5 +24,21 @@
     ],
     "id": "mem-1775798770399-d1em",
     "timestamp": 1775798770399
+  },
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 11 tool calls",
+    "context": "buat 3 jam kedepan enabled mode",
+    "outcome": "success",
+    "tags": [
+      "Read",
+      "Bash",
+      "Grep",
+      "ToolSearch",
+      "CronCreate"
+    ],
+    "id": "mem-1775807844557-flk5",
+    "timestamp": 1775807844557
   }
 ]

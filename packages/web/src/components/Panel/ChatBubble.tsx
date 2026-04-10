@@ -6,6 +6,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { ChatMessage } from "../../types";
 import { colors, fonts, fontSize, radius, spacing, shadows, glass, transition } from "../../styles/tokens";
+import { IconTool } from "../UI/Icons";
 
 // ─── Gold-tinted dark syntax theme ───────────────────────────────────────────
 const goldDarkTheme: Record<string, React.CSSProperties> = {
@@ -228,7 +229,7 @@ function ToolBubble({ message }: { message: ChatMessage }) {
               letterSpacing: "0.02em",
             }}
           >
-            <span style={{ fontSize: 10, opacity: 0.7 }}>⚙</span>
+            <IconTool size={10} style={{ opacity: 0.7, flexShrink: 0 }} />
             {toolName}
           </span>
 

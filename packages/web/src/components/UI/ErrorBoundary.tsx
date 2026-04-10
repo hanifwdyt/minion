@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from "react";
+import { IconWarning } from "./Icons";
 
 interface Props {
   children: ReactNode;
@@ -43,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
             fontFamily: "'Inter', sans-serif",
           }}
         >
-          <div style={{ fontSize: "32px" }}>⚠️</div>
+          <div style={{ color: "#b59a6a", opacity: 0.7 }}><IconWarning size={32} /></div>
           <div style={{ fontWeight: 600, fontSize: "14px" }}>
             {this.props.label || "Component"} error
           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../../store";
+import { IconSpeaker, IconSpeakerMuted } from "./Icons";
 
 // Simple tone-based SFX using Web Audio API (no external audio files needed)
 class SFXEngine {
@@ -132,18 +133,26 @@ export function MuteButton() {
       }}
       title={audioMuted ? "Unmute" : "Mute"}
       style={{
-        background: "rgba(255,255,255,0.1)",
-        border: "2px solid transparent",
-        borderRadius: "14px",
-        padding: "3px 10px",
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid transparent",
+        borderRadius: "8px",
+        padding: "5px 8px",
         cursor: "pointer",
-        color: "#FFE0B2",
-        fontSize: "14px",
+        color: audioMuted ? "rgba(255,224,178,0.35)" : "rgba(255,224,178,0.75)",
         transition: "all 0.2s",
-        opacity: audioMuted ? 0.5 : 1,
+        minWidth: 32, minHeight: 32,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+        e.currentTarget.style.transform = "scale(1.08)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+        e.currentTarget.style.transform = "scale(1)";
       }}
     >
-      {audioMuted ? "🔇" : "🔊"}
+      {audioMuted ? <IconSpeakerMuted size={14} /> : <IconSpeaker size={14} />}
     </button>
   );
 }

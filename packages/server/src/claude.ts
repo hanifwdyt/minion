@@ -1,6 +1,13 @@
 import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { TraceStore } from "./execution-trace.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = resolve(__dirname, "../data");
+const USAGE_PATH = resolve(DATA_DIR, "usage.json");
 
 interface ChatMessage {
   id: string;
@@ -73,9 +80,33 @@ export class ClaudeManager extends EventEmitter {
   private sessions: Map<string, ClaudeSession> = new Map();
   private lastSessionIds: Map<string, string> = new Map();
   private queues: Map<string, QueuedTask[]> = new Map();
-  private usage: UsageStats = { totalInputTokens: 0, totalOutputTokens: 0, byMinion: {} };
+  private usage: UsageStats;
   private taskProgress: Map<string, TaskProgress> = new Map(); // minionId → current task progress
   public traces = new TraceStore();
+
+  constructor() {
+    super();
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    if (existsSync(USAGE_PATH)) {
+      try {
+        this.usage = JSON.parse(readFileSync(USAGE_PATH, "utf-8"));
+      } catch {
+        this.usage = { totalInputTokens: 0, totalOutputTokens: 0, byMinion: {} };
+      }
+    } else {
+      this.usage = { totalInputTokens: 0, totalOutputTokens: 0, byMinion: {} };
+    }
+  }
+
+  private saveUsage() {
+    const tmp = USAGE_PATH + ".tmp";
+    try {
+      writeFileSync(tmp, JSON.stringify(this.usage, null, 2));
+      renameSync(tmp, USAGE_PATH);
+    } catch (err) {
+      console.error("[claude] Failed to save usage:", err);
+    }
+  }
 
   async runPrompt(
     minionId: string,
@@ -383,6 +414,7 @@ export class ClaudeManager extends EventEmitter {
         this.usage.byMinion[minionId].inputTokens += input;
         this.usage.byMinion[minionId].outputTokens += output;
         this.usage.byMinion[minionId].prompts++;
+        this.saveUsage();
       }
     }
   }

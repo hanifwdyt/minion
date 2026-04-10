@@ -1,37 +1,37 @@
 {
   "byMinion": {
     "semar": {
-      "totalTasks": 42,
-      "completedTasks": 15,
-      "failedTasks": 27,
-      "totalTokensInput": 152,
-      "totalTokensOutput": 51226,
-      "totalCost": 0.768846,
-      "totalDurationMs": 1765567,
+      "totalTasks": 48,
+      "completedTasks": 20,
+      "failedTasks": 28,
+      "totalTokensInput": 215,
+      "totalTokensOutput": 79283,
+      "totalCost": 1.1898900000000001,
+      "totalDurationMs": 2374778,
       "toolCallCounts": {
-        "Agent": 3,
-        "Bash": 96,
-        "Read": 114,
-        "Grep": 7,
+        "Agent": 4,
+        "Bash": 134,
+        "Read": 142,
+        "Grep": 14,
         "ToolSearch": 2,
         "TodoWrite": 4,
-        "Edit": 16,
-        "Glob": 7,
-        "Write": 11
+        "Edit": 30,
+        "Glob": 9,
+        "Write": 13
       },
-      "loopDetections": 1
+      "loopDetections": 3
     },
     "gareng": {
-      "totalTasks": 10,
-      "completedTasks": 9,
+      "totalTasks": 12,
+      "completedTasks": 11,
       "failedTasks": 1,
-      "totalTokensInput": 89,
-      "totalTokensOutput": 34565,
-      "totalCost": 0.518742,
-      "totalDurationMs": 1553090,
+      "totalTokensInput": 99,
+      "totalTokensOutput": 37552,
+      "totalCost": 0.563577,
+      "totalDurationMs": 1618310,
       "toolCallCounts": {
-        "Bash": 161,
-        "Read": 6,
+        "Bash": 166,
+        "Read": 8,
         "Agent": 3,
         "ToolSearch": 1,
         "WebSearch": 3,
@@ -61,18 +61,21 @@
       "loopDetections": 3
     },
     "bagong": {
-      "totalTasks": 6,
-      "completedTasks": 3,
+      "totalTasks": 7,
+      "completedTasks": 4,
       "failedTasks": 3,
-      "totalTokensInput": 21,
-      "totalTokensOutput": 2802,
-      "totalCost": 0.042093,
-      "totalDurationMs": 675987,
+      "totalTokensInput": 34,
+      "totalTokensOutput": 4870,
+      "totalCost": 0.073152,
+      "totalDurationMs": 724059,
       "toolCallCounts": {
-        "Bash": 26,
-        "Read": 8,
+        "Bash": 31,
+        "Read": 9,
         "Glob": 1,
-        "Edit": 1
+        "Edit": 1,
+        "Grep": 3,
+        "ToolSearch": 1,
+        "CronCreate": 1
       },
       "loopDetections": 0
     }
@@ -81,5 +84,5 @@
     "total": 0,
     "byMinion": {}
   },
-  "lastUpdated": 1775803566264
+  "lastUpdated": 1775807844557
 }

@@ -1,0 +1,21 @@
+{
+  "totalInputTokens": 56,
+  "totalOutputTokens": 26170,
+  "byMinion": {
+    "semar": {
+      "inputTokens": 36,
+      "outputTokens": 21500,
+      "prompts": 2
+    },
+    "gareng": {
+      "inputTokens": 7,
+      "outputTokens": 2602,
+      "prompts": 1
+    },
+    "bagong": {
+      "inputTokens": 13,
+      "outputTokens": 2068,
+      "prompts": 1
+    }
+  }
+}
