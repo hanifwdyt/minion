@@ -1,0 +1,76 @@
+[
+  {
+    "minionId": "gareng",
+    "type": "episodic",
+    "content": "Completed task with 5 tool calls",
+    "context": "kamu bisa akses gitlab ide-phoenix sya ?",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read"
+    ],
+    "id": "mem-1775780277258-8g7e",
+    "timestamp": 1775780277258
+  },
+  {
+    "minionId": "gareng",
+    "type": "episodic",
+    "content": "Completed task with 3 tool calls",
+    "context": "coba gua mau u bikin branch baru test-agentic-ai terus habis itu u push dan bikin PR, isinya tambahin aja test.md isinya test agentic ai",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775780343217-hj0d",
+    "timestamp": 1775780343217
+  },
+  {
+    "minionId": "gareng",
+    "type": "episodic",
+    "content": "Completed task with 8 tool calls",
+    "context": "https://mygitlab-dev.ioh.co.id/cco/cmo/group-digital-coe/div-smb-digital-product/ide-landing\n\nu bisa akses repo ini ?",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775780769280-d1ah",
+    "timestamp": 1775780769280
+  },
+  {
+    "minionId": "gareng",
+    "type": "episodic",
+    "content": "Completed task with 4 tool calls",
+    "context": "oke apa ada masalah? coba lanjutin",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775781285772-sc5l",
+    "timestamp": 1775781285772
+  },
+  {
+    "minionId": "gareng",
+    "type": "episodic",
+    "content": "Completed task with 64 tool calls",
+    "context": "Pelajari repo ide-phoenix dan ide-landing secara menyeluruh — struktur direktori, tech stack, arsitektur, tujuan masing-masing repo, dan bagaimana keduanya berkaitan sebagai 'workaround'. Dokumentasikan temuan lengkap.",
+    "outcome": "success",
+    "tags": [
+      "Agent",
+      "Bash"
+    ],
+    "id": "mem-1775781661731-5p4t",
+    "timestamp": 1775781661731
+  },
+  {
+    "minionId": "gareng",
+    "type": "episodic",
+    "content": "Completed task with 4 tool calls",
+    "context": "iya job prosesing. ada gini \n\nProcess timeout (10 minutes). Stopping.",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775793833976-sbr8",
+    "timestamp": 1775793833976
+  }
+]

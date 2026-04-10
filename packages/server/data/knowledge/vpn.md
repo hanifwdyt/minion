@@ -1,5 +1,20 @@
 # VPN — OpenConnect ke Indosat Internal Network
 
+## ⚡ FAST CHECK + CONNECT
+```bash
+# Cek dulu — kalau 302, VPN sudah konek atau tidak perlu
+STATUS=$(curl -sk -o /dev/null -w "%{http_code}" --connect-timeout 5 https://mygitlab-dev.ioh.co.id)
+if [ "$STATUS" != "302" ]; then
+  sudo systemctl start openconnect
+  # → minta user approve Silverfort di HP
+  # → tunggu user bilang "udah approve"
+  # → verify lagi sebelum lanjut
+fi
+```
+**Jangan connect kalau sudah konek. Jangan polling. Cek sekali, action sekali.**
+
+---
+
 ## Kapan Dibutuhkan
 - Akses GitLab internal: `mygitlab-dev.ioh.co.id` (IP: 10.49.178.251)
 - Push/pull ke GitLab repos

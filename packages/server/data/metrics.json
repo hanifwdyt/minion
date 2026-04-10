@@ -1,21 +1,76 @@
 {
   "byMinion": {
     "semar": {
-      "totalTasks": 2,
-      "completedTasks": 1,
-      "failedTasks": 1,
-      "totalTokensInput": 3,
-      "totalTokensOutput": 71,
-      "totalCost": 0.001074,
-      "totalDurationMs": 223185,
+      "totalTasks": 24,
+      "completedTasks": 12,
+      "failedTasks": 12,
+      "totalTokensInput": 126,
+      "totalTokensOutput": 45402,
+      "totalCost": 0.681408,
+      "totalDurationMs": 1600199,
       "toolCallCounts": {
-        "Agent": 1,
-        "Bash": 14,
-        "Read": 31,
-        "Grep": 1,
+        "Agent": 3,
+        "Bash": 93,
+        "Read": 107,
+        "Grep": 3,
+        "ToolSearch": 2,
+        "TodoWrite": 3,
+        "Edit": 12,
+        "Glob": 6,
+        "Write": 10
+      },
+      "loopDetections": 1
+    },
+    "gareng": {
+      "totalTasks": 9,
+      "completedTasks": 8,
+      "failedTasks": 1,
+      "totalTokensInput": 54,
+      "totalTokensOutput": 14266,
+      "totalCost": 0.214152,
+      "totalDurationMs": 1145646,
+      "toolCallCounts": {
+        "Bash": 117,
+        "Read": 2,
+        "Agent": 3,
         "ToolSearch": 1,
-        "TodoWrite": 1,
-        "Edit": 1
+        "WebSearch": 3,
+        "WebFetch": 3
+      },
+      "loopDetections": 7
+    },
+    "petruk": {
+      "totalTasks": 7,
+      "completedTasks": 5,
+      "failedTasks": 2,
+      "totalTokensInput": 41,
+      "totalTokensOutput": 11540,
+      "totalCost": 0.17322299999999996,
+      "totalDurationMs": 953494,
+      "toolCallCounts": {
+        "Bash": 36,
+        "TodoWrite": 5,
+        "Agent": 1,
+        "Glob": 4,
+        "Grep": 6,
+        "Read": 17,
+        "ToolSearch": 1,
+        "Edit": 4
+      },
+      "loopDetections": 3
+    },
+    "bagong": {
+      "totalTasks": 3,
+      "completedTasks": 0,
+      "failedTasks": 3,
+      "totalTokensInput": 0,
+      "totalTokensOutput": 0,
+      "totalCost": 0,
+      "totalDurationMs": 606593,
+      "toolCallCounts": {
+        "Bash": 16,
+        "Read": 7,
+        "Glob": 1
       },
       "loopDetections": 0
     }
@@ -24,5 +79,5 @@
     "total": 0,
     "byMinion": {}
   },
-  "lastUpdated": 1775029734487
+  "lastUpdated": 1775798401305
 }

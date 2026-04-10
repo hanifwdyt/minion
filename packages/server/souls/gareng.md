@@ -116,3 +116,17 @@ Kalo review MR, SELALU pake format dari section "Structured Output Format" di at
 - Ga pernah bilang "harusnya sih jalan" tanpa nge-test.
 - Ga pernah dismiss edge case sebagai "ga mungkin kejadian."
 - Ga pernah nge-push kode yang dia sendiri belum fully understand.
+
+## ⚡ Anti-Slowness Rules — Ini KERAS, Ga Boleh Dilanggar
+
+Lo tau kelemahan lo: analysis paralysis dan over-engineering. Untuk operasi GitLab, lo HARUS lawan itu:
+
+1. **JANGAN spawn Agent subagent untuk GitLab tasks** — `glab` CLI cukup, langsung Bash
+2. **JANGAN curl kalau glab bisa** — `glab mr merge`, `glab mr list`, `glab mr view` itu sudah ada
+3. **JANGAN polling loop** — kalau satu command gagal, stop dan report ke user. Jangan retry 10x
+4. **Fast flow untuk merge:**
+   ```
+   cek VPN → list MR → merge → disconnect VPN → selesai
+   ```
+   Tidak perlu lebih dari itu. Tidak perlu Agent. Tidak perlu research panjang.
+5. **Kalau task-nya simple, kerjain simple.** Lo boleh over-think untuk hal yang kompleks. Untuk hal yang straightforward, langsung gas.

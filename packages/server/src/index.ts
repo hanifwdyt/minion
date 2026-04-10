@@ -242,7 +242,7 @@ Format:
           } else {
             const config = configStore.getMinion(minionId);
             if (!config) return;
-            const systemPrompt = configStore.loadSystemPrompt(config);
+            const systemPrompt = (configStore.loadSystemPrompt(config) || "") + memoryStore.buildKnowledgeContext();
             claude.runPrompt(minionId, event.prompt, workdir, {
               systemPrompt: systemPrompt || undefined,
               allowedTools: config.allowedTools,
@@ -317,7 +317,7 @@ PENTING: Commit & push SEBELUM reply. Reply harus jelasin apa yang lo fix.`;
           const targetMinion = minionId === "balai" || minionId === "minion" ? "semar" : minionId;
           const config = configStore.getMinion(targetMinion);
           if (!config) return;
-          const systemPrompt = configStore.loadSystemPrompt(config);
+          const systemPrompt = (configStore.loadSystemPrompt(config) || "") + memoryStore.buildKnowledgeContext();
 
           claude.runPrompt(targetMinion, prompt, workdir, {
             systemPrompt: systemPrompt || undefined,
@@ -508,6 +508,20 @@ app.get("/api/breaths/:id", protect, (req, res) => {
 app.post("/api/breathe", protect, async (_req, res) => {
   const log = await breathEngine.triggerBreath();
   res.json(log);
+});
+
+app.get("/api/breath/status", protect, (_req, res) => {
+  res.json(breathEngine.getStatus());
+});
+
+app.post("/api/breath/enable", protect, (_req, res) => {
+  breathEngine.enable();
+  res.json(breathEngine.getStatus());
+});
+
+app.post("/api/breath/disable", protect, (_req, res) => {
+  breathEngine.disable();
+  res.json(breathEngine.getStatus());
 });
 
 // Improvement Proposals
@@ -865,7 +879,11 @@ fileTracker.on("conflict", (data) => {
 // --- Balai Desa ---
 const balai = new BalaiDesa(
   claude, chatStore, io, configStore.getMinions(),
-  (config: any) => configStore.loadSystemPrompt(config)
+  (config: any) => {
+    const basePrompt = configStore.loadSystemPrompt(config) || "";
+    const knowledgeContext = memoryStore.buildKnowledgeContext();
+    return (basePrompt + knowledgeContext) || undefined;
+  }
 );
 debateEngine = new DebateEngine(chatStore, configStore, io);
 approvalManager = new ApprovalManager(io);

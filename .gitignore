@@ -5,3 +5,8 @@ dist/
 .env
 .env.local
 .DS_Store
+packages/server/config-override.json
+packages/server/data/traces/
+packages/server/data/breaths/
+packages/server/data/breath-state.json
+*.tsbuildinfo

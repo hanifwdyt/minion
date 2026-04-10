@@ -1,12 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useStore } from "../../store";
 import { MuteButton } from "./AudioManager";
+
+const API = "/api";
 
 export function TopBar() {
   const { minions, connected, selectedMinionId, selectMinion, activityOpen, setActivityOpen, setDashboardOpen, cameraMode, setCameraMode } = useStore();
   const workingCount = minions.filter((m) => m.status === "working").length;
   const isBalaiSelected = selectedMinionId === "balai";
   const [menuOpen, setMenuOpen] = useState(false);
+  const [breathEnabled, setBreathEnabled] = useState(false);
+  const [breathLoading, setBreathLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/breath/status`)
+      .then((r) => r.json())
+      .then((data) => setBreathEnabled(data.manualEnabled ?? false))
+      .catch(() => {});
+  }, []);
+
+  async function toggleBreath() {
+    setBreathLoading(true);
+    try {
+      const endpoint = breathEnabled ? "disable" : "enable";
+      const res = await fetch(`${API}/breath/${endpoint}`, { method: "POST" });
+      const data = await res.json();
+      setBreathEnabled(data.manualEnabled ?? !breathEnabled);
+    } catch {
+      // silently fail
+    } finally {
+      setBreathLoading(false);
+    }
+  }
 
   return (
     <header
@@ -62,6 +87,21 @@ export function TopBar() {
       >
         {/* Audio + Camera */}
         <MuteButton />
+
+        {/* Breath toggle */}
+        <button
+          onClick={toggleBreath}
+          disabled={breathLoading}
+          title={breathEnabled ? "Breath ON (aktif sepanjang hari) — klik untuk balik ke jadwal malem" : "Breath OFF (jadwal malem aja) — klik untuk aktifin sepanjang hari"}
+          aria-label={breathEnabled ? "Nonaktifkan breath manual mode" : "Aktifkan breath manual mode"}
+          style={{
+            ...iconBtnStyle(breathEnabled),
+            opacity: breathLoading ? 0.5 : 1,
+          }}
+        >
+          {breathEnabled ? "☀️" : "🌙"}
+        </button>
+
         <button
           onClick={() => setCameraMode(cameraMode === "overview" ? "follow" : "overview")}
           aria-label={cameraMode === "follow" ? "Switch to overview camera" : "Switch to follow camera"}

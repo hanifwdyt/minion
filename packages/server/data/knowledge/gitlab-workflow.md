@@ -5,7 +5,57 @@
 - `glab` authenticated ke `mygitlab-dev.ioh.co.id`
 - Env vars: `$GITLAB_HOST`, `$GITLAB_TOKEN`, `$GITLAB_API`
 
-## glab CLI Commands
+---
+
+## ⚡ FAST FLOWS — Gunakan ini, jangan improvisasi
+
+### Merge MR (paling umum)
+```bash
+# 1. Cek VPN
+curl -sk -o /dev/null -w "%{http_code}" --connect-timeout 5 https://mygitlab-dev.ioh.co.id
+# Kalau bukan 302 → connect VPN dulu (lihat vpn.md)
+
+# 2. Cek MR list
+glab mr list
+
+# 3. Merge
+glab mr merge <MR_IID> --squash --remove-source-branch
+```
+**Selesai. 3 langkah. Jangan lebih.**
+
+### Review MR
+```bash
+glab mr view <MR_IID>   # baca deskripsi
+glab mr diff <MR_IID>   # baca diff
+glab mr comment <MR_IID> --message "review text"
+glab mr approve <MR_IID>  # kalau approve
+```
+
+### Respond to Review Comment (FULL AUTO)
+```bash
+# 1. Fix kode, commit, push
+# 2. Reply discussion
+curl -X POST "$GITLAB_API/projects/$PROJECT_ID/merge_requests/$MR_IID/discussions/$DISCUSSION_ID/notes" \
+  -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H "Content-Type: application/json" \
+  -d '{"body":"Fixed. [jelaskan perubahan]"}'
+# 3. Resolve
+curl -X PUT "$GITLAB_API/projects/$PROJECT_ID/merge_requests/$MR_IID/discussions/$DISCUSSION_ID" \
+  -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H "Content-Type: application/json" \
+  -d '{"resolved":true}'
+```
+
+---
+
+## ⚠️ Rules — WAJIB Diikuti
+
+- **SELALU gunakan `glab` CLI untuk MR operations** — jangan curl kalau glab bisa
+- **JANGAN spawn Agent subagent untuk GitLab tasks** — lakukan langsung dengan Bash + glab
+- **JANGAN polling loop** — cek sekali, kalau gagal stop dan report ke user
+- **Satu task = satu VPN session** — connect, kerjakan, disconnect. Tidak boleh biarkan VPN nyala
+
+---
+
+## glab CLI — Full Reference
 
 ### MR Operations
 ```bash
@@ -26,6 +76,9 @@ glab mr comment <MR_IID> --message "review text"
 
 # Approve MR
 glab mr approve <MR_IID>
+
+# Merge MR
+glab mr merge <MR_IID> --squash --remove-source-branch
 ```
 
 ### CI/CD

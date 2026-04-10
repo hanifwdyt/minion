@@ -20,6 +20,10 @@ const BREATHS_DIR = resolve(import.meta.dirname, "../data/breaths");
 const KNOWLEDGE_DIR = resolve(import.meta.dirname, "../data/knowledge");
 const BREATH_SOUL = resolve(import.meta.dirname, "../souls/breath.md");
 
+const NIGHT_SCHEDULE = "*/10 21-23,0-5 * * *";
+const ALL_DAY_SCHEDULE = "*/10 * * * *";
+const BREATH_STATE_PATH = resolve(import.meta.dirname, "../data/breath-state.json");
+
 export class BreathEngine {
   private job: cron.ScheduledTask | null = null;
   private claude: ClaudeManager;
@@ -28,6 +32,7 @@ export class BreathEngine {
   private configStore: ConfigStore;
   private breathing = false;
   private breathCount = 0;
+  private manualEnabled = false;
 
   constructor(
     claude: ClaudeManager,
@@ -43,11 +48,20 @@ export class BreathEngine {
     // Ensure directories exist
     mkdirSync(BREATHS_DIR, { recursive: true });
     mkdirSync(KNOWLEDGE_DIR, { recursive: true });
+
+    // Restore persisted state
+    try {
+      const saved = JSON.parse(readFileSync(BREATH_STATE_PATH, "utf-8"));
+      this.manualEnabled = saved.manualEnabled ?? false;
+    } catch {
+      // No saved state, use default
+    }
   }
 
-  start(schedule = "*/10 * * * *") {
+  start(nightSchedule = NIGHT_SCHEDULE) {
+    const schedule = this.manualEnabled ? ALL_DAY_SCHEDULE : nightSchedule;
     this.job = cron.schedule(schedule, () => this.breathe());
-    logger.info({ schedule }, "Breath engine started — Semar will reflect periodically");
+    logger.info({ schedule, manualEnabled: this.manualEnabled }, "Breath engine started — Semar will reflect periodically");
   }
 
   stop() {
@@ -55,6 +69,44 @@ export class BreathEngine {
       this.job.stop();
       this.job = null;
       logger.info("Breath engine stopped");
+    }
+  }
+
+  /** Enable breath for all hours (manual mode) */
+  enable() {
+    this.manualEnabled = true;
+    this.persistState();
+    // Restart job with all-day schedule
+    this.stop();
+    this.job = cron.schedule(ALL_DAY_SCHEDULE, () => this.breathe());
+    logger.info("Breath manual mode ON — Semar akan nafas sepanjang hari");
+  }
+
+  /** Disable manual mode, back to night-only */
+  disable() {
+    this.manualEnabled = false;
+    this.persistState();
+    // Restart job with night-only schedule
+    this.stop();
+    this.job = cron.schedule(NIGHT_SCHEDULE, () => this.breathe());
+    logger.info("Breath manual mode OFF — Semar balik ke jadwal malem aja");
+  }
+
+  /** Get current breath engine status */
+  getStatus() {
+    return {
+      manualEnabled: this.manualEnabled,
+      schedule: this.manualEnabled ? ALL_DAY_SCHEDULE : NIGHT_SCHEDULE,
+      breathing: this.breathing,
+      breathCount: this.breathCount,
+    };
+  }
+
+  private persistState() {
+    try {
+      writeFileSync(BREATH_STATE_PATH, JSON.stringify({ manualEnabled: this.manualEnabled }, null, 2));
+    } catch (err: any) {
+      logger.error({ err: err.message }, "Failed to persist breath state");
     }
   }
 

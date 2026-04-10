@@ -1,0 +1,43 @@
+[
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 22 tool calls",
+    "context": "## Context dari step sebelumnya:\nProcess timeout (10 minutes). Stopping.\n\n---\n\n## Task lo sekarang:\nBerdasarkan analisa Gareng, implementasikan filter dan search di sales role order list di ide-phoenix agar setara dengan yang ada di admin. Pastikan UI dan behavior-nya konsisten.",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "TodoWrite"
+    ],
+    "id": "mem-1775783901316-nuk3",
+    "timestamp": 1775783901316
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 30 tool calls",
+    "context": "u bisa pelajari flow breath di code minion ini ga ?",
+    "outcome": "success",
+    "tags": [
+      "Agent",
+      "Glob",
+      "Grep",
+      "Read",
+      "Bash"
+    ],
+    "id": "mem-1775796968541-cdkw",
+    "timestamp": 1775796968541
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "gapaham gua. kalo matahari dia on breath mode nya ?",
+    "outcome": "success",
+    "tags": [
+      "Read"
+    ],
+    "id": "mem-1775797169566-09hl",
+    "timestamp": 1775797169566
+  }
+]
