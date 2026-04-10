@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
+import { colors, fonts, fontSize, radius, spacing, shadows, glass, transition } from "../../styles/tokens";
 
 const API = "/api";
 
@@ -37,11 +38,73 @@ async function apiFetch(path: string, opts?: RequestInit) {
   return res.json();
 }
 
+// --- Shared styles ---
+const glassInputStyle: CSSProperties = {
+  width: "100%",
+  padding: `${spacing.sm}px ${spacing.md}px`,
+  borderRadius: radius.md,
+  ...glass.input,
+  color: colors.text,
+  fontSize: fontSize.sm,
+  fontFamily: fonts.mono,
+  outline: "none",
+  boxSizing: "border-box",
+  transition: `border ${transition.fast}`,
+};
+
+const glassInputFocusStyle: CSSProperties = {
+  border: `1px solid ${colors.gold}`,
+  boxShadow: `0 0 0 2px ${colors.goldGlow}`,
+};
+
+function btnStyle(bg: string): CSSProperties {
+  return {
+    background: bg,
+    color: bg === colors.gold || bg === colors.goldBright ? colors.textInverse : "#fff",
+    border: "none",
+    borderRadius: radius.md,
+    padding: `${spacing.sm}px ${spacing.lg}px`,
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: fontSize.xs,
+    fontFamily: fonts.sans,
+    transition: `all ${transition.fast}`,
+    letterSpacing: "0.3px",
+  };
+}
+
+function btnGold(active?: boolean): CSSProperties {
+  return {
+    ...btnStyle(active ? colors.success : colors.gold),
+    color: active ? "#fff" : colors.textInverse,
+  };
+}
+
+function btnGhost(): CSSProperties {
+  return {
+    background: "transparent",
+    color: colors.textMuted,
+    border: `1px solid ${colors.glassBorder}`,
+    borderRadius: radius.md,
+    padding: `${spacing.sm}px ${spacing.lg}px`,
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: fontSize.xs,
+    fontFamily: fonts.sans,
+    transition: `all ${transition.fast}`,
+  };
+}
+
 // --- Main Dashboard ---
 export function Dashboard({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("minions");
   const [needsAuth, setNeedsAuth] = useState(false);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setMounted(true));
+  }, []);
 
   // Check if auth is needed on mount
   useEffect(() => {
@@ -57,7 +120,7 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
   const tabs: { id: Tab; label: string }[] = [
     { id: "minions", label: "Minions" },
     { id: "souls", label: "Souls" },
-    { id: "context", label: "Shared Context" },
+    { id: "context", label: "Context" },
     { id: "integrations", label: "Integrations" },
     { id: "usage", label: "Usage" },
     { id: "activity", label: "Activity" },
@@ -72,62 +135,130 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
       onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
       style={{
         position: "fixed", inset: 0, zIndex: 200,
-        background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+        background: "rgba(10, 8, 6, 0.7)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
         display: "flex", justifyContent: "center", alignItems: "center",
+        opacity: mounted ? 1 : 0,
+        transition: `opacity ${transition.normal}`,
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="dashboard-modal" style={{
-        width: "90%", maxWidth: 900, height: "80vh",
-        background: "#FFF8F0", borderRadius: 16,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-        display: "flex", flexDirection: "column", overflow: "hidden",
-      }}>
+      <div
+        style={{
+          width: "90%", maxWidth: 920, height: "80vh",
+          ...glass.panel,
+          background: colors.glassBg,
+          borderRadius: radius.xxl,
+          boxShadow: shadows.xl,
+          display: "flex", flexDirection: "column", overflow: "hidden",
+          transform: mounted ? "scale(1)" : "scale(0.95)",
+          opacity: mounted ? 1 : 0,
+          transition: `transform ${transition.spring}, opacity ${transition.normal}`,
+        }}
+      >
         {/* Header */}
         <div style={{
-          padding: "16px 24px", background: "#5D4037", color: "#FFE0B2",
+          padding: `${spacing.lg}px ${spacing.xl}px`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
+          borderBottom: `1px solid ${colors.glassBorder}`,
         }}>
-          <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: 1 }}>
-            PUNAKAWAN Dashboard
+          <div style={{
+            fontFamily: fonts.display,
+            fontSize: fontSize.xl,
+            color: colors.gold,
+            letterSpacing: "0.5px",
+          }}>
+            Punakawan
           </div>
-          <button onClick={onClose} style={{
-            background: "rgba(255,255,255,0.1)", border: "none", color: "#FFE0B2",
-            borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 16,
-          }}>x</button>
+          <button
+            onClick={onClose}
+            aria-label="Close dashboard"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: `1px solid ${colors.glassBorder}`,
+              color: colors.textLight,
+              borderRadius: radius.md,
+              width: 32, height: 32,
+              cursor: "pointer",
+              fontSize: 16,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: `all ${transition.fast}`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = colors.text;
+              e.currentTarget.style.borderColor = colors.goldBorder;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = colors.textLight;
+              e.currentTarget.style.borderColor = colors.glassBorder;
+            }}
+          >
+            ×
+          </button>
         </div>
 
-        {/* Tabs */}
+        {/* Tab pills */}
         <div style={{
-          display: "flex", gap: 0, borderBottom: "2px solid #DAA520",
-          background: "#EFEBE9",
+          display: "flex", gap: spacing.xs,
+          padding: `${spacing.md}px ${spacing.xl}px`,
+          borderBottom: `1px solid ${colors.glassBorder}`,
+          overflowX: "auto",
         }}>
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => { setTab(t.id); setError(""); }} style={{
-              padding: "10px 20px", border: "none", cursor: "pointer",
-              background: tab === t.id ? "#FFF8F0" : "transparent",
-              color: tab === t.id ? "#5D4037" : "#888",
-              fontWeight: tab === t.id ? 700 : 500,
-              fontSize: 13, borderBottom: tab === t.id ? "2px solid #DAA520" : "2px solid transparent",
-              fontFamily: "'Inter', sans-serif",
-            }}>{t.label}</button>
-          ))}
+          {tabs.map((t) => {
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => { setTab(t.id); setError(""); }}
+                style={{
+                  padding: `${spacing.sm}px ${spacing.lg}px`,
+                  borderRadius: radius.full,
+                  border: "none",
+                  cursor: "pointer",
+                  background: isActive ? colors.gold : "transparent",
+                  color: isActive ? colors.textInverse : colors.textMuted,
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: fontSize.sm,
+                  fontFamily: fonts.sans,
+                  transition: `all ${transition.fast}`,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.color = colors.text;
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.color = colors.textMuted;
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Error banner */}
         {error && (
           <div style={{
-            padding: "8px 24px", background: "#FFF0F0", color: "#E53935",
-            fontSize: 12, borderBottom: "1px solid #FFCDD2",
-            display: "flex", justifyContent: "space-between",
+            padding: `${spacing.sm}px ${spacing.xl}px`,
+            background: colors.errorBg,
+            color: colors.error,
+            fontSize: fontSize.xs,
+            borderBottom: `1px solid ${colors.errorBorder}`,
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            fontFamily: fonts.mono,
           }}>
             <span>{error}</span>
-            <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "#E53935", cursor: "pointer" }}>x</button>
+            <button onClick={() => setError("")} style={{
+              background: "none", border: "none", color: colors.error,
+              cursor: "pointer", fontSize: 14,
+            }}>×</button>
           </div>
         )}
 
         {/* Content */}
-        <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
+        <div style={{ flex: 1, overflow: "auto", padding: spacing.xl }}>
           {tab === "minions" && <MinionsTab onError={setError} />}
           {tab === "souls" && <SoulsTab onError={setError} />}
           {tab === "context" && <ContextTab onError={setError} />}
@@ -146,6 +277,11 @@ function LoginScreen({ onLogin, onClose }: { onLogin: (token: string) => void; o
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setMounted(true));
+  }, []);
 
   const handleLogin = async () => {
     try {
@@ -166,23 +302,61 @@ function LoginScreen({ onLogin, onClose }: { onLogin: (token: string) => void; o
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 200,
-      background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+      background: "rgba(10, 8, 6, 0.7)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
       display: "flex", justifyContent: "center", alignItems: "center",
     }}>
       <div style={{
-        width: 360, background: "#FFF8F0", borderRadius: 16, padding: 32,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+        width: 380,
+        ...glass.panel,
+        background: colors.glassBg,
+        borderRadius: radius.xxl,
+        padding: spacing.xxxl,
+        boxShadow: shadows.xl,
+        transform: mounted ? "scale(1)" : "scale(0.95)",
+        opacity: mounted ? 1 : 0,
+        transition: `transform ${transition.spring}, opacity ${transition.normal}`,
       }}>
-        <div style={{ fontWeight: 800, fontSize: 18, color: "#5D4037", marginBottom: 20, textAlign: "center" }}>
-          PUNAKAWAN Login
+        <div style={{
+          fontFamily: fonts.display,
+          fontSize: fontSize.xxl,
+          color: colors.gold,
+          marginBottom: spacing.xl,
+          textAlign: "center",
+        }}>
+          Punakawan
         </div>
-        {error && <div style={{ color: "#E53935", fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</div>}
+        <div style={{
+          fontSize: fontSize.sm,
+          color: colors.textMuted,
+          textAlign: "center",
+          marginBottom: spacing.xl,
+          fontFamily: fonts.sans,
+        }}>
+          Sign in to continue
+        </div>
+        {error && (
+          <div style={{
+            color: colors.error,
+            fontSize: fontSize.xs,
+            marginBottom: spacing.md,
+            textAlign: "center",
+            fontFamily: fonts.mono,
+          }}>
+            {error}
+          </div>
+        )}
         <Field label="Username" value={user} onChange={setUser} />
-        <div style={{ height: 8 }} />
+        <div style={{ height: spacing.md }} />
         <Field label="Password" value={pass} onChange={setPass} type="password" />
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button onClick={handleLogin} style={{ ...btnStyle("#5D4037"), flex: 1, padding: "10px 0" }}>Login</button>
-          <button onClick={onClose} style={{ ...btnStyle("#999"), padding: "10px 16px" }}>Cancel</button>
+        <div style={{ display: "flex", gap: spacing.sm, marginTop: spacing.xl }}>
+          <button onClick={handleLogin} style={{ ...btnStyle(colors.gold), flex: 1, padding: `${spacing.md}px 0` }}>
+            Login
+          </button>
+          <button onClick={onClose} style={{ ...btnGhost(), padding: `${spacing.md}px ${spacing.lg}px` }}>
+            Cancel
+          </button>
         </div>
       </div>
     </div>
@@ -211,38 +385,68 @@ function MinionsTab({ onError }: { onError: (msg: string) => void }) {
     } catch (e: any) { onError(e.message); }
   };
 
+  const minionColors: Record<string, string> = {
+    semar: colors.semar,
+    gareng: colors.gareng,
+    petruk: colors.petruk,
+    bagong: colors.bagong,
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
+      {minions.length === 0 && <EmptyState text="No minions configured" />}
       {minions.map((m) => (
         <div key={m.id} style={{
-          background: "#FFF", borderRadius: 12, padding: 16,
-          border: `2px solid ${editing === m.id ? "#DAA520" : "#E0E0E0"}`,
+          ...glass.card,
+          borderRadius: radius.lg,
+          padding: spacing.lg,
+          border: editing === m.id ? `1px solid ${colors.goldBorder}` : `1px solid ${colors.glassBorder}`,
+          transition: `border ${transition.fast}`,
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md }}>
+            <div style={{ display: "flex", alignItems: "center", gap: spacing.md }}>
               <div style={{
-                width: 32, height: 32, borderRadius: "50%",
-                background: m.color || "#888",
+                width: 36, height: 36, borderRadius: radius.full,
+                background: minionColors[m.id] || m.color || colors.goldDim,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                color: "white", fontWeight: 800, fontSize: 13,
-              }}>{m.name?.[0] || "?"}</div>
+                color: "#fff", fontWeight: 800, fontSize: fontSize.sm,
+                fontFamily: fonts.display,
+                boxShadow: `0 0 12px ${(minionColors[m.id] || colors.goldDim)}33`,
+              }}>
+                {m.name?.[0] || "?"}
+              </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{m.name}</div>
-                <div style={{ fontSize: 12, color: "#888" }}>{m.role} · {m.status}</div>
+                <div style={{ fontWeight: 700, fontSize: fontSize.md, color: colors.text, fontFamily: fonts.sans }}>
+                  {m.name}
+                </div>
+                <div style={{ fontSize: fontSize.xs, color: colors.textMuted, fontFamily: fonts.sans }}>
+                  {m.role}
+                  <span style={{
+                    marginLeft: spacing.sm,
+                    padding: `1px ${spacing.sm}px`,
+                    borderRadius: radius.full,
+                    fontSize: 10,
+                    background: m.status === "idle" ? colors.goldGlow : "rgba(90, 158, 111, 0.15)",
+                    color: m.status === "idle" ? colors.goldDim : colors.success,
+                    fontWeight: 600,
+                  }}>
+                    {m.status}
+                  </span>
+                </div>
               </div>
             </div>
             {editing === m.id ? (
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => save(m.id)} style={btnStyle("#4CAF50")}>Save</button>
-                <button onClick={() => setEditing(null)} style={btnStyle("#999")}>Cancel</button>
+              <div style={{ display: "flex", gap: spacing.sm }}>
+                <button onClick={() => save(m.id)} style={btnStyle(colors.success)}>Save</button>
+                <button onClick={() => setEditing(null)} style={btnGhost()}>Cancel</button>
               </div>
             ) : (
-              <button onClick={() => { setEditing(m.id); setForm(m); }} style={btnStyle("#5D4037")}>Edit</button>
+              <button onClick={() => { setEditing(m.id); setForm(m); }} style={btnGold()}>Edit</button>
             )}
           </div>
 
           {editing === m.id && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: spacing.md }}>
               <Field label="Allowed Tools" value={form.allowedTools || ""} onChange={(v) => setForm({ ...form, allowedTools: v })} />
               <Field label="Max Turns" value={String(form.maxTurns || "")} onChange={(v) => setForm({ ...form, maxTurns: Number(v) || 1 })} />
               <Field label="Model" value={form.model || ""} onChange={(v) => setForm({ ...form, model: v })} placeholder="e.g. claude-sonnet-4-6" />
@@ -251,10 +455,10 @@ function MinionsTab({ onError }: { onError: (msg: string) => void }) {
           )}
 
           {editing !== m.id && (
-            <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#888", flexWrap: "wrap" }}>
-              <span>Tools: <code>{m.allowedTools}</code></span>
-              <span>Turns: {m.maxTurns}</span>
-              <span>Model: {m.model || "default"}</span>
+            <div style={{ display: "flex", gap: spacing.lg, fontSize: fontSize.xs, color: colors.textMuted, flexWrap: "wrap", fontFamily: fonts.mono }}>
+              <span>tools: <span style={{ color: colors.textSecondary }}>{m.allowedTools}</span></span>
+              <span>turns: <span style={{ color: colors.textSecondary }}>{m.maxTurns}</span></span>
+              <span>model: <span style={{ color: colors.textSecondary }}>{m.model || "default"}</span></span>
             </div>
           )}
         </div>
@@ -278,7 +482,6 @@ function SoulsTab({ onError }: { onError: (msg: string) => void }) {
     }).catch((e) => onError(e.message));
   }, [onError]);
 
-  // Load soul when selected changes (fixes race condition)
   useEffect(() => {
     if (!selected) return;
     const reqId = ++loadingRef.current;
@@ -298,29 +501,61 @@ function SoulsTab({ onError }: { onError: (msg: string) => void }) {
     } catch (e: any) { onError(e.message); }
   };
 
+  const minionColors: Record<string, string> = {
+    semar: colors.semar,
+    gareng: colors.gareng,
+    petruk: colors.petruk,
+    bagong: colors.bagong,
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: spacing.md, height: "100%" }}>
+      <div style={{ display: "flex", gap: spacing.sm, alignItems: "center" }}>
         {minions.map((m) => (
           <button key={m.id} onClick={() => setSelected(m.id)}
             style={{
-              padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: selected === m.id ? "#5D4037" : "#E0E0E0",
-              color: selected === m.id ? "#FFE0B2" : "#666",
-              fontWeight: 600, fontSize: 13,
-            }}>{m.name}</button>
+              padding: `${spacing.sm}px ${spacing.lg}px`,
+              borderRadius: radius.full,
+              border: "none",
+              cursor: "pointer",
+              background: selected === m.id ? (minionColors[m.id] || colors.gold) : "transparent",
+              color: selected === m.id ? "#fff" : colors.textMuted,
+              fontWeight: 600,
+              fontSize: fontSize.sm,
+              fontFamily: fonts.sans,
+              transition: `all ${transition.fast}`,
+            }}>
+            {m.name}
+          </button>
         ))}
         <div style={{ flex: 1 }} />
-        <button onClick={saveSoul} style={btnStyle(saved ? "#4CAF50" : "#DAA520")}>
+        <button onClick={saveSoul} style={btnGold(saved)}>
           {saved ? "Saved!" : "Save"}
         </button>
       </div>
       <textarea value={content} onChange={(e) => setContent(e.target.value)}
         style={{
-          flex: 1, minHeight: 300, background: "#FFF", border: "1px solid #E0E0E0",
-          borderRadius: 8, padding: 14, fontSize: 13, lineHeight: 1.6,
-          fontFamily: "'JetBrains Mono', monospace", resize: "none", outline: "none",
-        }} />
+          flex: 1, minHeight: 300,
+          ...glass.input,
+          color: colors.text,
+          borderRadius: radius.md,
+          padding: spacing.lg,
+          fontSize: fontSize.sm,
+          lineHeight: 1.7,
+          fontFamily: fonts.mono,
+          resize: "none",
+          outline: "none",
+          boxSizing: "border-box",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.border = `1px solid ${colors.gold}`;
+          e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.goldGlow}`;
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.border = glass.input.border as string;
+          e.currentTarget.style.boxShadow = "none";
+        }}
+      />
     </div>
   );
 }
@@ -343,22 +578,46 @@ function ContextTab({ onError }: { onError: (msg: string) => void }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: spacing.md, height: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>Shared Context</div>
-          <div style={{ fontSize: 12, color: "#888" }}>Injected into every minion's system prompt</div>
+          <div style={{
+            fontWeight: 700, fontSize: fontSize.lg, color: colors.text,
+            fontFamily: fonts.display,
+          }}>
+            Shared Context
+          </div>
+          <div style={{ fontSize: fontSize.xs, color: colors.textMuted, fontFamily: fonts.sans }}>
+            Injected into every minion's system prompt
+          </div>
         </div>
-        <button onClick={save} style={btnStyle(saved ? "#4CAF50" : "#DAA520")}>
+        <button onClick={save} style={btnGold(saved)}>
           {saved ? "Saved!" : "Save"}
         </button>
       </div>
       <textarea value={content} onChange={(e) => setContent(e.target.value)}
         style={{
-          flex: 1, minHeight: 300, background: "#FFF", border: "1px solid #E0E0E0",
-          borderRadius: 8, padding: 14, fontSize: 13, lineHeight: 1.6,
-          fontFamily: "'JetBrains Mono', monospace", resize: "none", outline: "none",
-        }} />
+          flex: 1, minHeight: 300,
+          ...glass.input,
+          color: colors.text,
+          borderRadius: radius.md,
+          padding: spacing.lg,
+          fontSize: fontSize.sm,
+          lineHeight: 1.7,
+          fontFamily: fonts.mono,
+          resize: "none",
+          outline: "none",
+          boxSizing: "border-box",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.border = `1px solid ${colors.gold}`;
+          e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.goldGlow}`;
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.border = glass.input.border as string;
+          e.currentTarget.style.boxShadow = "none";
+        }}
+      />
     </div>
   );
 }
@@ -385,7 +644,7 @@ function IntegrationsTab({ onError }: { onError: (msg: string) => void }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: spacing.xl }}>
       <Section title="Telegram Bot">
         <Toggle label="Enabled" value={config.telegram?.enabled} onChange={(v) => updateField("telegram", "enabled", v)} />
         <Field label="Bot Token" value={config.telegram?.token || ""} onChange={(v) => updateField("telegram", "token", v)} placeholder="123456:ABC-DEF..." type="password" />
@@ -403,7 +662,7 @@ function IntegrationsTab({ onError }: { onError: (msg: string) => void }) {
         <Field label="Secret" value={config.webhook?.secret || ""} onChange={(v) => updateField("webhook", "secret", v)} type="password" />
       </Section>
 
-      <button onClick={save} style={{ ...btnStyle(saved ? "#4CAF50" : "#DAA520"), alignSelf: "flex-end" }}>
+      <button onClick={save} style={{ ...btnGold(saved), alignSelf: "flex-end" }}>
         {saved ? "Saved!" : "Save All"}
       </button>
     </div>
@@ -422,29 +681,48 @@ function UsageTab() {
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
+      <div style={{ display: "flex", gap: spacing.lg }}>
         <StatCard label="Total Input Tokens" value={usage.totalInputTokens || 0} />
         <StatCard label="Total Output Tokens" value={usage.totalOutputTokens || 0} />
       </div>
 
-      <div style={{ fontWeight: 700, fontSize: 15, marginTop: 8 }}>Per Minion</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {Object.entries(usage.byMinion || {}).map(([id, stats]: [string, any]) => (
-          <div key={id} style={{
-            background: "#FFF", borderRadius: 8, padding: 14, border: "1px solid #E0E0E0",
-          }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{id}</div>
-            <div style={{ fontSize: 12, color: "#666", display: "flex", flexDirection: "column", gap: 4 }}>
-              <span>Prompts: {stats.prompts}</span>
-              <span>Input: {stats.inputTokens?.toLocaleString()} tokens</span>
-              <span>Output: {stats.outputTokens?.toLocaleString()} tokens</span>
+      <div style={{
+        fontWeight: 700, fontSize: fontSize.md, marginTop: spacing.sm,
+        color: colors.text, fontFamily: fonts.display,
+      }}>
+        Per Minion
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: spacing.md }}>
+        {Object.entries(usage.byMinion || {}).map(([id, stats]: [string, any]) => {
+          const minionColor = (colors as any)[id] || colors.goldDim;
+          return (
+            <div key={id} style={{
+              ...glass.card,
+              borderRadius: radius.lg,
+              padding: spacing.lg,
+            }}>
+              <div style={{
+                fontWeight: 700, fontSize: fontSize.md, marginBottom: spacing.sm,
+                color: minionColor, fontFamily: fonts.sans,
+              }}>
+                {id}
+              </div>
+              <div style={{
+                fontSize: fontSize.xs, color: colors.textMuted,
+                display: "flex", flexDirection: "column", gap: spacing.xs,
+                fontFamily: fonts.mono,
+              }}>
+                <span>prompts: <span style={{ color: colors.textSecondary }}>{stats.prompts}</span></span>
+                <span>input: <span style={{ color: colors.textSecondary }}>{stats.inputTokens?.toLocaleString()}</span></span>
+                <span>output: <span style={{ color: colors.textSecondary }}>{stats.outputTokens?.toLocaleString()}</span></span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {Object.keys(usage.byMinion || {}).length === 0 && (
-        <div style={{ color: "#999", textAlign: "center", padding: 40 }}>No usage data yet</div>
+        <EmptyState text="No usage data yet" />
       )}
     </div>
   );
@@ -461,19 +739,37 @@ function ActivityTab() {
     return () => clearInterval(iv);
   }, []);
 
+  const minionColors: Record<string, string> = {
+    semar: colors.semar,
+    gareng: colors.gareng,
+    petruk: colors.petruk,
+    bagong: colors.bagong,
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {events.length === 0 && <div style={{ color: "#999", textAlign: "center", padding: 40 }}>No activity yet</div>}
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {events.length === 0 && <EmptyState text="No activity yet" />}
       {events.map((e) => (
         <div key={e.id} style={{
-          display: "flex", gap: 10, padding: "6px 0", fontSize: 12,
-          borderBottom: "1px solid #F0F0F0",
+          display: "flex", gap: spacing.md, padding: `${spacing.sm}px 0`, fontSize: fontSize.xs,
+          borderBottom: `1px solid ${colors.glassBorder}`,
+          alignItems: "center",
         }}>
-          <span style={{ color: "#999", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
+          <div style={{
+            width: 5, height: 5, borderRadius: radius.full, flexShrink: 0,
+            background: minionColors[e.minionId] || colors.goldDim,
+          }} />
+          <span style={{
+            color: colors.textLight, fontFamily: fonts.mono, flexShrink: 0, fontSize: 10,
+          }}>
             {new Date(e.timestamp).toLocaleTimeString()}
           </span>
-          <span style={{ fontWeight: 600, color: "#5D4037", flexShrink: 0 }}>{e.minionName}</span>
-          <span style={{ color: "#666" }}>{e.summary}</span>
+          <span style={{
+            fontWeight: 600, color: minionColors[e.minionId] || colors.textSecondary, flexShrink: 0,
+          }}>
+            {e.minionName}
+          </span>
+          <span style={{ color: colors.textMuted }}>{e.summary}</span>
         </div>
       ))}
     </div>
@@ -505,127 +801,192 @@ function ProposalsTab() {
     setLoading(null);
   };
 
-  const priorityColor: Record<string, string> = {
-    high: "#D32F2F",
-    medium: "#F57C00",
-    low: "#388E3C",
+  const priorityStyles: Record<string, { bg: string; color: string }> = {
+    high: { bg: "rgba(199, 84, 80, 0.15)", color: colors.error },
+    medium: { bg: "rgba(212, 160, 67, 0.15)", color: colors.amber },
+    low: { bg: "rgba(90, 158, 111, 0.15)", color: colors.success },
   };
 
   const statusIcon: Record<string, string> = {
-    pending: "⏳",
-    approved: "✅",
-    rejected: "❌",
-    done: "✔️",
+    pending: "~",
+    approved: "+",
+    rejected: "x",
+    done: "ok",
   };
 
   const pending = proposals.filter((p) => p.status === "pending");
   const others = proposals.filter((p) => p.status !== "pending" && p.id !== "init");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Pending proposals */}
+    <div style={{ display: "flex", flexDirection: "column", gap: spacing.md }}>
       {pending.length === 0 && others.length === 0 && (
-        <div style={{ color: "#999", textAlign: "center", padding: 40 }}>
-          No proposals yet. Breath system will generate improvement proposals overnight (9PM-6AM).
-        </div>
+        <EmptyState text="No proposals yet. The breath system generates improvement proposals overnight." />
       )}
 
       {pending.length > 0 && (
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#5D4037", marginBottom: 4 }}>
+        <div style={{
+          fontSize: fontSize.sm, fontWeight: 700, color: colors.gold,
+          marginBottom: spacing.xs, fontFamily: fonts.display,
+        }}>
           Pending Approval ({pending.length})
         </div>
       )}
 
-      {pending.map((p) => (
-        <div key={p.id} style={{
-          border: "2px solid #FFE0B2", borderRadius: 10, overflow: "hidden",
-          background: "#FFFAF5",
-        }}>
-          <div
-            style={{
-              padding: "12px 16px", cursor: "pointer",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-            }}
-            onClick={() => setExpanded(expanded === p.id ? null : p.id)}
-          >
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {pending.map((p) => {
+        const ps = priorityStyles[p.priority] || priorityStyles.medium;
+        const isExpanded = expanded === p.id;
+
+        return (
+          <div key={p.id} style={{
+            ...glass.card,
+            borderRadius: radius.lg,
+            overflow: "hidden",
+            border: `1px solid ${colors.goldBorder}`,
+          }}>
+            <div
+              style={{
+                padding: `${spacing.md}px ${spacing.lg}px`,
+                cursor: "pointer",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                transition: `background ${transition.fast}`,
+              }}
+              onClick={() => setExpanded(isExpanded ? null : p.id)}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(200, 163, 90, 0.05)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              <div style={{ display: "flex", gap: spacing.sm, alignItems: "center", flex: 1, minWidth: 0 }}>
+                {/* Priority badge */}
+                <span style={{
+                  fontSize: 10, fontWeight: 700,
+                  padding: `2px ${spacing.sm}px`,
+                  borderRadius: radius.sm,
+                  background: ps.bg,
+                  color: ps.color,
+                  textTransform: "uppercase",
+                  fontFamily: fonts.mono,
+                  flexShrink: 0,
+                  letterSpacing: "0.5px",
+                }}>
+                  {p.priority || "medium"}
+                </span>
+
+                {/* Category */}
+                <span style={{
+                  fontSize: 10, color: colors.textLight,
+                  background: colors.glassHighlight,
+                  border: `1px solid ${colors.glassBorder}`,
+                  padding: `2px ${spacing.sm}px`,
+                  borderRadius: radius.sm,
+                  fontFamily: fonts.mono,
+                  flexShrink: 0,
+                }}>
+                  {p.category || "general"}
+                </span>
+
+                {/* Title */}
+                <span style={{
+                  fontWeight: 600, fontSize: fontSize.sm, color: colors.text,
+                  fontFamily: fonts.sans,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {p.title}
+                </span>
+              </div>
+
               <span style={{
-                fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-                background: priorityColor[p.priority] || "#999", color: "white",
-                textTransform: "uppercase",
+                fontSize: 10, color: colors.textLight,
+                transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                transition: `transform ${transition.fast}`,
+                flexShrink: 0, marginLeft: spacing.sm,
               }}>
-                {p.priority || "medium"}
+                ▼
               </span>
-              <span style={{ fontSize: 11, color: "#999", background: "#F0F0F0", padding: "2px 6px", borderRadius: 4 }}>
-                {p.category || "general"}
-              </span>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>{p.title}</span>
             </div>
-            <span style={{ fontSize: 16 }}>{expanded === p.id ? "▲" : "▼"}</span>
-          </div>
 
-          {expanded === p.id && (
-            <div style={{ padding: "0 16px 16px" }}>
-              <div style={{
-                fontSize: 12, color: "#555", whiteSpace: "pre-wrap",
-                background: "#FFF", padding: 12, borderRadius: 8, marginBottom: 12,
-                border: "1px solid #EEE", lineHeight: 1.6,
-              }}>
-                {p.description || "No description"}
-              </div>
-
-              {p.estimatedImpact && (
-                <div style={{ fontSize: 11, color: "#388E3C", marginBottom: 12 }}>
-                  Expected impact: {p.estimatedImpact}
+            {isExpanded && (
+              <div style={{ padding: `0 ${spacing.lg}px ${spacing.lg}px` }}>
+                <div style={{
+                  fontSize: fontSize.xs, color: colors.textMuted,
+                  whiteSpace: "pre-wrap",
+                  ...glass.input,
+                  padding: spacing.md,
+                  borderRadius: radius.md,
+                  marginBottom: spacing.md,
+                  lineHeight: 1.7,
+                  fontFamily: fonts.mono,
+                }}>
+                  {p.description || "No description"}
                 </div>
-              )}
 
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => handleAction(p.id, "approve")}
-                  disabled={loading === p.id}
-                  style={{
-                    padding: "8px 20px", borderRadius: 6, border: "none",
-                    background: "#388E3C", color: "white", fontWeight: 600,
-                    cursor: "pointer", fontSize: 12,
-                  }}
-                >
-                  {loading === p.id ? "Executing..." : "Approve & Execute"}
-                </button>
-                <button
-                  onClick={() => handleAction(p.id, "reject")}
-                  disabled={loading === p.id}
-                  style={{
-                    padding: "8px 20px", borderRadius: 6,
-                    border: "1px solid #DDD", background: "white", color: "#999",
-                    cursor: "pointer", fontSize: 12,
-                  }}
-                >
-                  Reject
-                </button>
+                {p.estimatedImpact && (
+                  <div style={{
+                    fontSize: fontSize.xs, color: colors.success,
+                    marginBottom: spacing.md, fontFamily: fonts.sans,
+                  }}>
+                    Expected impact: {p.estimatedImpact}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: spacing.sm }}>
+                  <button
+                    onClick={() => handleAction(p.id, "approve")}
+                    disabled={loading === p.id}
+                    style={{
+                      ...btnStyle(colors.success),
+                      padding: `${spacing.sm}px ${spacing.xl}px`,
+                      opacity: loading === p.id ? 0.6 : 1,
+                    }}
+                  >
+                    {loading === p.id ? "Executing..." : "Approve & Execute"}
+                  </button>
+                  <button
+                    onClick={() => handleAction(p.id, "reject")}
+                    disabled={loading === p.id}
+                    style={{
+                      ...btnGhost(),
+                      opacity: loading === p.id ? 0.6 : 1,
+                    }}
+                  >
+                    Reject
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      ))}
+            )}
+          </div>
+        );
+      })}
 
       {/* Completed proposals */}
       {others.length > 0 && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#999", marginTop: 8 }}>
+          <div style={{
+            fontSize: fontSize.sm, fontWeight: 700, color: colors.textLight,
+            marginTop: spacing.sm, fontFamily: fonts.display,
+          }}>
             History
           </div>
           {others.map((p) => (
             <div key={p.id} style={{
-              padding: "8px 16px", borderRadius: 8, background: "#F5F5F5",
+              padding: `${spacing.sm}px ${spacing.lg}px`,
+              borderRadius: radius.md,
+              ...glass.card,
               display: "flex", justifyContent: "space-between", alignItems: "center",
-              opacity: 0.7,
+              opacity: 0.6,
             }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span>{statusIcon[p.status] || ""}</span>
-                <span style={{ fontSize: 12 }}>{p.title}</span>
+              <div style={{ display: "flex", gap: spacing.sm, alignItems: "center" }}>
+                <span style={{
+                  fontFamily: fonts.mono, fontSize: 10,
+                  color: p.status === "approved" ? colors.success : colors.textLight,
+                }}>
+                  [{statusIcon[p.status] || "?"}]
+                </span>
+                <span style={{ fontSize: fontSize.xs, color: colors.textMuted, fontFamily: fonts.sans }}>
+                  {p.title}
+                </span>
               </div>
-              <span style={{ fontSize: 10, color: "#999" }}>{p.status}</span>
+              <span style={{ fontSize: 10, color: colors.textLight, fontFamily: fonts.mono }}>
+                {p.status}
+              </span>
             </div>
           ))}
         </>
@@ -641,43 +1002,74 @@ function Field({ label, value, onChange, placeholder, type }: {
 }) {
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 4 }}>{label}</div>
-      <input value={value} onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder} type={type || "text"}
-        style={{
-          width: "100%", padding: "8px 10px", borderRadius: 6,
-          border: "1px solid #E0E0E0", fontSize: 13,
-          fontFamily: "'JetBrains Mono', monospace", outline: "none",
-          boxSizing: "border-box",
-        }} />
+      <div style={{
+        fontSize: fontSize.xs, fontWeight: 600, color: colors.textLight,
+        marginBottom: spacing.xs, fontFamily: fonts.sans,
+        textTransform: "uppercase", letterSpacing: "0.5px",
+      }}>
+        {label}
+      </div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        type={type || "text"}
+        style={glassInputStyle}
+        onFocus={(e) => {
+          Object.assign(e.currentTarget.style, glassInputFocusStyle);
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.border = glass.input.border as string;
+          e.currentTarget.style.boxShadow = "none";
+        }}
+      />
     </div>
   );
 }
 
 function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: spacing.sm }}>
       <div onClick={() => onChange(!value)} style={{
-        width: 36, height: 20, borderRadius: 10,
-        background: value ? "#4CAF50" : "#CCC", cursor: "pointer",
-        position: "relative", transition: "background 0.2s",
+        width: 36, height: 20, borderRadius: radius.full,
+        background: value ? colors.success : colors.bgElevated,
+        border: `1px solid ${value ? "rgba(90, 158, 111, 0.3)" : colors.glassBorder}`,
+        cursor: "pointer",
+        position: "relative",
+        transition: `all ${transition.fast}`,
       }}>
         <div style={{
-          width: 16, height: 16, borderRadius: "50%", background: "#FFF",
+          width: 14, height: 14, borderRadius: radius.full,
+          background: value ? "#fff" : colors.textLight,
           position: "absolute", top: 2,
-          left: value ? 18 : 2, transition: "left 0.2s",
+          left: value ? 19 : 2,
+          transition: `left ${transition.spring}`,
+          boxShadow: shadows.sm,
         }} />
       </div>
-      <span style={{ fontSize: 13 }}>{label}</span>
+      <span style={{ fontSize: fontSize.sm, color: colors.textSecondary, fontFamily: fonts.sans }}>
+        {label}
+      </span>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: "#FFF", borderRadius: 12, padding: 16, border: "1px solid #E0E0E0" }}>
-      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>{title}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
+    <div style={{
+      ...glass.card,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+    }}>
+      <div style={{
+        fontWeight: 700, fontSize: fontSize.md, marginBottom: spacing.md,
+        color: colors.text, fontFamily: fonts.display,
+      }}>
+        {title}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: spacing.md }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -685,18 +1077,39 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div style={{
-      flex: 1, background: "#FFF", borderRadius: 12, padding: 16,
-      border: "1px solid #E0E0E0", textAlign: "center",
+      flex: 1,
+      ...glass.card,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      textAlign: "center",
     }}>
-      <div style={{ fontSize: 24, fontWeight: 800, color: "#5D4037" }}>{value.toLocaleString()}</div>
-      <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{label}</div>
+      <div style={{
+        fontSize: fontSize.xxl, fontWeight: 800, color: colors.gold,
+        fontFamily: fonts.display,
+      }}>
+        {value.toLocaleString()}
+      </div>
+      <div style={{
+        fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.xs,
+        fontFamily: fonts.sans,
+      }}>
+        {label}
+      </div>
     </div>
   );
 }
 
-function btnStyle(bg: string): React.CSSProperties {
-  return {
-    background: bg, color: "white", border: "none", borderRadius: 8,
-    padding: "6px 14px", cursor: "pointer", fontWeight: 600, fontSize: 12,
-  };
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div style={{
+      color: colors.textLight,
+      textAlign: "center",
+      padding: spacing.xxxl,
+      fontFamily: fonts.display,
+      fontSize: fontSize.lg,
+      fontStyle: "italic",
+    }}>
+      {text}
+    </div>
+  );
 }

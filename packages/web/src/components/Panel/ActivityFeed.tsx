@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { colors, fonts, fontSize, radius, spacing, shadows, glass, transition } from "../../styles/tokens";
 
 interface ActivityEvent {
   id: string;
@@ -15,126 +16,274 @@ interface ActivityFeedProps {
   onClose: () => void;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  prompt: "💬",
-  response: "💭",
-  tool: "🔧",
-  status: "📍",
-  error: "❌",
-  pipeline: "🔗",
-  delegate: "👉",
+const MINION_COLORS: Record<string, string> = {
+  semar: colors.semar,
+  gareng: colors.gareng,
+  petruk: colors.petruk,
+  bagong: colors.bagong,
+  balai: colors.goldDim,
 };
 
-const MINION_COLORS: Record<string, string> = {
-  semar: "#DAA520",
-  gareng: "#CC5500",
-  petruk: "#8B1A1A",
-  bagong: "#1B5E20",
-  balai: "#5D4037",
-};
+function relativeTime(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 5) return "now";
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
+const COLLAPSED_HEIGHT = 40;
+const EXPANDED_HEIGHT = 220;
 
 export function ActivityFeed({ events, open, onClose }: ActivityFeedProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
 
+  // When open changes externally, sync expanded state
   useEffect(() => {
-    if (scrollRef.current) {
+    if (!open) setExpanded(false);
+  }, [open]);
+
+  // Auto-scroll when new events arrive (only in expanded mode)
+  useEffect(() => {
+    if (expanded && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [events]);
+  }, [events, expanded]);
 
-  if (!open) return null;
+  if (!open && events.length === 0) return null;
+
+  const latestEvent = events[events.length - 1];
+  const currentHeight = expanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT;
 
   return (
     <div
       role="log"
       aria-label="Activity feed"
-      className="activity-feed"
       style={{
         position: "fixed",
         bottom: 0,
         left: 0,
         right: 0,
-        height: "220px",
-        background: "rgba(40, 30, 25, 0.95)",
-        backdropFilter: "blur(8px)",
-        borderTop: "2px solid #DAA520",
+        height: currentHeight,
+        ...glass.panel,
+        background: colors.glassBg,
+        borderTop: `1px solid ${colors.glassBorder}`,
+        borderRadius: expanded ? `${radius.lg}px ${radius.lg}px 0 0` : 0,
+        boxShadow: expanded ? shadows.lg : shadows.sm,
         zIndex: 90,
         display: "flex",
         flexDirection: "column",
-        fontFamily: "'Inter', sans-serif",
+        fontFamily: fonts.sans,
+        transition: `height ${transition.spring}`,
+        overflow: "hidden",
       }}
     >
-      {/* Header */}
+      {/* Collapsed bar / Header */}
       <div
+        onClick={() => {
+          if (!expanded) setExpanded(true);
+        }}
         style={{
-          padding: "8px 16px",
+          height: COLLAPSED_HEIGHT,
+          minHeight: COLLAPSED_HEIGHT,
+          padding: `0 ${spacing.lg}px`,
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
-          borderBottom: "1px solid rgba(218,165,32,0.2)",
+          gap: spacing.md,
+          cursor: expanded ? "default" : "pointer",
+          borderBottom: expanded ? `1px solid ${colors.glassBorder}` : "none",
+          transition: `border-bottom ${transition.fast}`,
         }}
       >
-        <span style={{ color: "#FFE0B2", fontWeight: 700, fontSize: "12px", letterSpacing: "1px" }}>
-          ACTIVITY FEED
-        </span>
-        <button
-          onClick={onClose}
-          aria-label="Close activity feed"
+        {/* Pulse dot */}
+        {latestEvent && (
+          <div
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: radius.full,
+              background: MINION_COLORS[latestEvent.minionId] || colors.gold,
+              boxShadow: `0 0 6px ${MINION_COLORS[latestEvent.minionId] || colors.gold}`,
+              flexShrink: 0,
+            }}
+          />
+        )}
+
+        {/* Latest event one-liner */}
+        <div
           style={{
-            background: "none",
-            border: "none",
-            color: "#BCAAA4",
-            fontSize: "16px",
-            cursor: "pointer",
-            minWidth: "32px",
-            minHeight: "32px",
+            flex: 1,
+            fontSize: fontSize.xs,
+            color: colors.textMuted,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontFamily: fonts.mono,
+            letterSpacing: "0.2px",
           }}
         >
-          ×
-        </button>
+          {latestEvent ? (
+            <>
+              <span style={{ color: MINION_COLORS[latestEvent.minionId] || colors.textSecondary, fontWeight: 600 }}>
+                {latestEvent.minionName}
+              </span>
+              <span style={{ color: colors.textLight, margin: `0 ${spacing.sm}px` }}>
+                {relativeTime(latestEvent.timestamp)}
+              </span>
+              <span style={{ color: colors.textMuted }}>{latestEvent.summary}</span>
+            </>
+          ) : (
+            <span style={{ color: colors.textLight }}>No activity yet</span>
+          )}
+        </div>
+
+        {/* Event count badge */}
+        {events.length > 0 && !expanded && (
+          <div
+            style={{
+              fontSize: fontSize.xs,
+              color: colors.gold,
+              background: colors.goldGlow,
+              padding: `2px ${spacing.sm}px`,
+              borderRadius: radius.full,
+              fontWeight: 600,
+              fontFamily: fonts.mono,
+            }}
+          >
+            {events.length}
+          </div>
+        )}
+
+        {/* Expand/Close button */}
+        {expanded ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(false);
+              onClose();
+            }}
+            aria-label="Close activity feed"
+            style={{
+              background: "none",
+              border: "none",
+              color: colors.textLight,
+              fontSize: 18,
+              cursor: "pointer",
+              minWidth: 28,
+              minHeight: 28,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: radius.sm,
+              transition: `color ${transition.fast}`,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = colors.text)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = colors.textLight)}
+          >
+            ×
+          </button>
+        ) : (
+          <div
+            style={{
+              fontSize: 10,
+              color: colors.textLight,
+              transform: "rotate(180deg)",
+              transition: `transform ${transition.fast}`,
+            }}
+          >
+            ▾
+          </div>
+        )}
       </div>
 
-      {/* Events */}
+      {/* Expanded event feed */}
       <div
         ref={scrollRef}
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: "8px 16px",
+          padding: `${spacing.sm}px ${spacing.lg}px`,
+          opacity: expanded ? 1 : 0,
+          transition: `opacity ${transition.normal}`,
         }}
       >
         {events.length === 0 ? (
-          <div style={{ color: "#666", fontSize: "12px", textAlign: "center", paddingTop: 20 }}>
+          <div
+            style={{
+              color: colors.textLight,
+              fontSize: fontSize.sm,
+              textAlign: "center",
+              paddingTop: spacing.xl,
+              fontFamily: fonts.display,
+              fontStyle: "italic",
+            }}
+          >
             No activity yet
           </div>
         ) : (
           events.map((event) => {
-            const time = new Date(event.timestamp).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            });
-            const color = MINION_COLORS[event.minionId] || "#888";
+            const dotColor = MINION_COLORS[event.minionId] || colors.textLight;
 
             return (
               <div
                 key={event.id}
                 style={{
                   display: "flex",
-                  gap: "8px",
-                  padding: "3px 0",
-                  fontSize: "11px",
-                  alignItems: "flex-start",
+                  gap: spacing.sm,
+                  padding: `3px 0`,
+                  fontSize: fontSize.xs,
+                  alignItems: "center",
                 }}
               >
-                <span style={{ color: "#666", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
-                  {time}
+                {/* Colored dot */}
+                <div
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: radius.full,
+                    background: dotColor,
+                    flexShrink: 0,
+                    opacity: 0.9,
+                  }}
+                />
+
+                {/* Relative time */}
+                <span
+                  style={{
+                    color: colors.textLight,
+                    fontFamily: fonts.mono,
+                    fontSize: 10,
+                    flexShrink: 0,
+                    minWidth: 28,
+                    textAlign: "right",
+                  }}
+                >
+                  {relativeTime(event.timestamp)}
                 </span>
-                <span style={{ flexShrink: 0 }}>{TYPE_ICONS[event.type] || "•"}</span>
-                <span style={{ color, fontWeight: 600, flexShrink: 0 }}>
+
+                {/* Minion name */}
+                <span
+                  style={{
+                    color: dotColor,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                    fontSize: fontSize.xs,
+                  }}
+                >
                   {event.minionName}
                 </span>
-                <span style={{ color: "#BCAAA4", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+
+                {/* Summary */}
+                <span
+                  style={{
+                    color: colors.textMuted,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {event.summary}
                 </span>
               </div>

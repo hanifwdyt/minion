@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useStore } from "../../store";
 import { MuteButton } from "./AudioManager";
+import { colors, fonts, fontSize, shadows, transition, glass, radius } from "../../styles/tokens";
 
 const API = "/api";
 
@@ -8,7 +9,6 @@ export function TopBar() {
   const { minions, connected, selectedMinionId, selectMinion, activityOpen, setActivityOpen, setDashboardOpen, cameraMode, setCameraMode } = useStore();
   const workingCount = minions.filter((m) => m.status === "working").length;
   const isBalaiSelected = selectedMinionId === "balai";
-  const [menuOpen, setMenuOpen] = useState(false);
   const [breathEnabled, setBreathEnabled] = useState(false);
   const [breathLoading, setBreathLoading] = useState(false);
 
@@ -26,9 +26,7 @@ export function TopBar() {
       const res = await fetch(`${API}/breath/${endpoint}`, { method: "POST" });
       const data = await res.json();
       setBreathEnabled(data.manualEnabled ?? !breathEnabled);
-    } catch {
-      // silently fail
-    } finally {
+    } catch {} finally {
       setBreathLoading(false);
     }
   }
@@ -38,183 +36,202 @@ export function TopBar() {
       role="banner"
       style={{
         position: "fixed",
-        top: 0, left: 0, right: 0,
-        height: "48px",
-        background: "rgba(93, 64, 55, 0.92)",
-        backdropFilter: "blur(12px)",
-        borderBottom: "2px solid #DAA520",
+        top: 12, left: 16, right: 16,
+        height: 52,
+        ...glass.panel,
+        borderRadius: radius.xl,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 20px",
         zIndex: 50,
+        boxShadow: shadows.lg,
+        animation: "fadeInDown 600ms cubic-bezier(0.34, 1.56, 0.64, 1)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <span style={{ fontSize: "20px" }} aria-hidden="true">🎭</span>
-        <span style={{ fontWeight: 800, fontSize: "16px", letterSpacing: "1px", color: "#FFE0B2" }}>
-          PUNAKAWAN
-        </span>
-        <span style={{ fontSize: "11px", color: "#BCAAA4", fontWeight: 500 }} className="hide-mobile">
-          Agen AI Nusantara
-        </span>
+      {/* Logo */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{
+          width: 28, height: 28,
+          borderRadius: radius.md,
+          background: `linear-gradient(135deg, ${colors.gold}, ${colors.goldDim})`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 14,
+          boxShadow: shadows.glow,
+        }}>
+          🎭
+        </div>
+        <div>
+          <span style={{
+            fontFamily: fonts.display,
+            fontSize: fontSize.lg,
+            color: colors.parchment,
+            letterSpacing: 0.5,
+          }}>
+            Punakawan
+          </span>
+          <span style={{
+            fontSize: fontSize.xs,
+            color: colors.textMuted,
+            marginLeft: 8,
+            fontWeight: 400,
+          }} className="hide-mobile">
+            Agen AI Nusantara
+          </span>
+        </div>
       </div>
 
-      {/* Mobile hamburger */}
-      <button
-        onClick={() => setMenuOpen(!menuOpen)}
-        aria-label="Toggle menu"
-        aria-expanded={menuOpen}
-        style={{
-          display: "none",
-          background: "none", border: "none", color: "#FFE0B2",
-          fontSize: "20px", cursor: "pointer", padding: "4px 8px",
-        }}
-        className="show-mobile-only"
+      {/* Controls */}
+      <nav role="navigation" aria-label="Main navigation" className="top-bar-buttons"
+        style={{ display: "flex", alignItems: "center", gap: 6 }}
       >
-        ☰
-      </button>
-
-      <nav
-        role="navigation"
-        aria-label="Main navigation"
-        className="top-bar-buttons"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-        }}
-      >
-        {/* Audio + Camera */}
         <MuteButton />
 
-        {/* Breath toggle */}
-        <button
+        <IconBtn
           onClick={toggleBreath}
           disabled={breathLoading}
-          title={breathEnabled ? "Breath ON (aktif sepanjang hari) — klik untuk balik ke jadwal malem" : "Breath OFF (jadwal malem aja) — klik untuk aktifin sepanjang hari"}
-          aria-label={breathEnabled ? "Nonaktifkan breath manual mode" : "Aktifkan breath manual mode"}
-          style={{
-            ...iconBtnStyle(breathEnabled),
-            opacity: breathLoading ? 0.5 : 1,
-          }}
-        >
-          {breathEnabled ? "☀️" : "🌙"}
-        </button>
+          active={breathEnabled}
+          label={breathEnabled ? "Breath ON" : "Breath OFF"}
+          icon={breathEnabled ? "☀️" : "🌙"}
+        />
 
-        <button
+        <IconBtn
           onClick={() => setCameraMode(cameraMode === "overview" ? "follow" : "overview")}
-          aria-label={cameraMode === "follow" ? "Switch to overview camera" : "Switch to follow camera"}
-          style={iconBtnStyle(cameraMode === "follow")}
-        >
-          {cameraMode === "follow" ? "🎯" : "🎥"}
-        </button>
+          active={cameraMode === "follow"}
+          label={cameraMode === "follow" ? "Overview camera" : "Follow camera"}
+          icon={cameraMode === "follow" ? "🎯" : "🎥"}
+        />
 
-        {/* Dashboard */}
-        <button
+        <IconBtn
           onClick={() => setDashboardOpen(true)}
-          aria-label="Open dashboard"
-          style={iconBtnStyle(false)}
-        >
-          ⚙️
-        </button>
+          active={false}
+          label="Dashboard"
+          icon="⚙️"
+        />
 
-        {/* Activity feed toggle */}
-        <button
+        <IconBtn
           onClick={() => setActivityOpen(!activityOpen)}
-          aria-label={activityOpen ? "Close activity feed" : "Open activity feed"}
-          style={iconBtnStyle(activityOpen)}
-        >
-          📋
-        </button>
+          active={activityOpen}
+          label="Activity"
+          icon="📋"
+        />
 
-        {/* Balai Desa button */}
+        {/* Divider */}
+        <div style={{ width: 1, height: 24, background: colors.glassBorder, margin: "0 4px" }} />
+
+        {/* Balai Desa */}
         <button
           onClick={() => selectMinion("balai")}
-          aria-label="Open Balai Desa shared channel"
-          aria-pressed={isBalaiSelected}
+          aria-label="Balai Desa"
           style={{
-            background: isBalaiSelected ? "rgba(218,165,32,0.3)" : "rgba(255,255,255,0.1)",
-            border: isBalaiSelected ? "2px solid #DAA520" : "2px solid transparent",
-            borderRadius: "14px",
-            padding: "3px 12px",
+            background: isBalaiSelected
+              ? `linear-gradient(135deg, rgba(200,163,90,0.25), rgba(200,163,90,0.1))`
+              : "rgba(255,255,255,0.04)",
+            border: isBalaiSelected ? `1px solid ${colors.goldBorder}` : "1px solid transparent",
+            borderRadius: radius.lg,
+            padding: "5px 14px",
             cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            color: "#FFE0B2",
-            fontSize: "11px",
-            fontWeight: 700,
-            transition: "all 0.2s",
-            minHeight: "32px",
+            display: "flex", alignItems: "center", gap: 6,
+            color: isBalaiSelected ? colors.gold : colors.textSecondary,
+            fontSize: fontSize.xs,
+            fontWeight: 600,
+            fontFamily: fonts.sans,
+            transition: `all ${transition.normal}`,
+            letterSpacing: 0.3,
+          }}
+          onMouseEnter={(e) => {
+            if (!isBalaiSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+          }}
+          onMouseLeave={(e) => {
+            if (!isBalaiSelected) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
           }}
         >
-          <span aria-hidden="true">🏛</span>
-          <span className="hide-mobile">Balai Desa</span>
+          🏛 <span className="hide-mobile">Balai</span>
         </button>
 
-        {/* Minion avatars */}
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }} role="group" aria-label="Minion selection">
-          {minions.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => selectMinion(m.id)}
-              aria-label={`${m.name} — ${m.status}`}
-              aria-pressed={selectedMinionId === m.id}
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                background: m.color,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#FFE0B2",
-                fontSize: "11px",
-                fontWeight: 700,
-                cursor: "pointer",
-                border:
-                  m.status === "working"
-                    ? "2px solid #FFD54F"
-                    : selectedMinionId === m.id
-                    ? "2px solid #FFE0B2"
+        {/* Minion Avatars */}
+        <div style={{ display: "flex", gap: 4, alignItems: "center", marginLeft: 2 }}>
+          {minions.map((m, i) => {
+            const isSelected = selectedMinionId === m.id;
+            const isWorking = m.status === "working";
+            const minionColor = (colors as any)[m.id] || m.color;
+
+            return (
+              <button
+                key={m.id}
+                onClick={() => selectMinion(m.id)}
+                aria-label={`${m.name} — ${m.status}`}
+                style={{
+                  width: 32, height: 32,
+                  borderRadius: radius.full,
+                  background: isSelected
+                    ? `linear-gradient(135deg, ${minionColor}, ${minionColor}88)`
+                    : `${minionColor}33`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: isSelected ? colors.parchment : minionColor,
+                  fontSize: fontSize.xs,
+                  fontWeight: 700,
+                  fontFamily: fonts.sans,
+                  cursor: "pointer",
+                  border: isSelected
+                    ? `2px solid ${minionColor}`
                     : "2px solid transparent",
-                boxShadow: m.status === "working" ? "0 0 8px rgba(255,213,79,0.5)" : "none",
-                transition: "all 0.3s",
-                padding: 0,
-              }}
-            >
-              {m.name?.[0] || "?"}
-              <span className="sr-only">{m.name} — {m.status}</span>
-            </button>
-          ))}
+                  boxShadow: isWorking ? `0 0 12px ${minionColor}44` : "none",
+                  transition: `all ${transition.spring}`,
+                  padding: 0,
+                  position: "relative",
+                  marginLeft: i > 0 ? -4 : 0,
+                  zIndex: isSelected ? 3 : isWorking ? 2 : 1,
+                  animation: isWorking ? "pulseGlow 2s infinite" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.15)";
+                  e.currentTarget.style.zIndex = "5";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.zIndex = isSelected ? "3" : "1";
+                }}
+              >
+                {m.name?.[0]}
+                {/* Status dot */}
+                {isWorking && (
+                  <span style={{
+                    position: "absolute", bottom: -1, right: -1,
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: colors.success,
+                    border: `2px solid ${colors.bg}`,
+                    animation: "statusPulse 1.5s infinite",
+                  }} />
+                )}
+              </button>
+            );
+          })}
         </div>
 
+        {/* Status indicators */}
         {!connected && (
-          <span
-            role="alert"
-            style={{
-              fontSize: "12px", color: "#EF5350", fontWeight: 600,
-              background: "rgba(239,83,80,0.15)",
-              padding: "2px 10px", borderRadius: "10px",
-              border: "1px solid rgba(239,83,80,0.3)",
-              animation: "pulse 2s infinite",
-            }}
-          >
-            Reconnecting...
+          <span role="alert" style={{
+            fontSize: fontSize.xs, color: colors.error, fontWeight: 500,
+            background: `${colors.error}15`,
+            padding: "3px 10px", borderRadius: radius.full,
+            border: `1px solid ${colors.error}30`,
+            animation: "breathe 2s infinite",
+            fontFamily: fonts.sans,
+          }}>
+            Reconnecting
           </span>
         )}
 
         {workingCount > 0 && (
-          <span
-            aria-live="polite"
-            style={{
-              fontSize: "12px", color: "#FFD54F", fontWeight: 600,
-              background: "rgba(255,213,79,0.15)",
-              padding: "2px 10px", borderRadius: "10px",
-              border: "1px solid rgba(255,213,79,0.3)",
-            }}
-          >
+          <span aria-live="polite" style={{
+            fontSize: fontSize.xs, color: colors.gold, fontWeight: 600,
+            background: colors.goldGlow,
+            padding: "3px 10px", borderRadius: radius.full,
+            border: `1px solid ${colors.goldBorder}`,
+            fontFamily: fonts.sans,
+            letterSpacing: 0.3,
+          }}>
             {workingCount} nyambut gawe
           </span>
         )}
@@ -223,20 +240,48 @@ export function TopBar() {
   );
 }
 
-function iconBtnStyle(active: boolean): React.CSSProperties {
-  return {
-    background: active ? "rgba(218,165,32,0.3)" : "rgba(255,255,255,0.1)",
-    border: active ? "2px solid #DAA520" : "2px solid transparent",
-    borderRadius: "14px",
-    padding: "3px 10px",
-    cursor: "pointer",
-    color: "#FFE0B2",
-    fontSize: "14px",
-    transition: "all 0.2s",
-    minWidth: "32px",
-    minHeight: "32px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  };
+function IconBtn({ onClick, active, label, icon, disabled }: {
+  onClick: () => void;
+  active: boolean;
+  label: string;
+  icon: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      style={{
+        background: active
+          ? `linear-gradient(135deg, rgba(200,163,90,0.2), rgba(200,163,90,0.08))`
+          : "rgba(255,255,255,0.03)",
+        border: active ? `1px solid ${colors.goldBorder}` : "1px solid transparent",
+        borderRadius: radius.md,
+        padding: "5px 8px",
+        cursor: disabled ? "default" : "pointer",
+        color: active ? colors.gold : colors.textMuted,
+        fontSize: 14,
+        transition: `all ${transition.normal}`,
+        minWidth: 32, minHeight: 32,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        opacity: disabled ? 0.4 : 1,
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled && !active) {
+          e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+          e.currentTarget.style.transform = "scale(1.08)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!disabled && !active) {
+          e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+          e.currentTarget.style.transform = "scale(1)";
+        }
+      }}
+    >
+      {icon}
+    </button>
+  );
 }

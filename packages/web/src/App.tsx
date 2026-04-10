@@ -30,38 +30,50 @@ export default function App() {
   const { minions, selectMinion, activityEvents, activityOpen, setActivityOpen, dashboardOpen, setDashboardOpen, connected } = useStore();
 
   return (
-    <div style={{ width: "100%", height: "100vh" }}>
+    <div style={{ width: "100%", height: "100vh", position: "relative" }}>
+      {/* Vignette overlay */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 1,
+          background:
+            "radial-gradient(ellipse at center, transparent 40%, rgba(26, 20, 16, 0.45) 100%)",
+        }}
+      />
+
       <TopBar />
       <AudioManager />
       <Toaster />
 
       <ErrorBoundary label="3D Scene">
-      <Canvas
-        shadows
-        style={{ background: "#D7CCC8" }}
-        camera={{ position: [14, 11, 14], fov: 35 }}
-        onPointerMissed={() => selectMinion(null)}
-      >
-        {/* Dynamic day/night lighting */}
-        <DayNightCycle />
+        <Canvas
+          shadows
+          style={{ background: "#1a1410" }}
+          camera={{ position: [14, 11, 14], fov: 35 }}
+          onPointerMissed={() => selectMinion(null)}
+        >
+          {/* Dynamic day/night lighting */}
+          <DayNightCycle />
 
-        <fog attach="fog" args={["#D7CCC8", 22, 45]} />
-        <color attach="background" args={["#D7CCC8"]} />
+          <fog attach="fog" args={["#1a1410", 22, 45]} />
+          <color attach="background" args={["#1a1410"]} />
 
-        <IsometricCamera />
-        <Room />
+          <IsometricCamera />
+          <Room />
 
-        {minions.map((minion) => (
-          <Minion
-            key={minion.id}
-            minion={minion}
-            startPosition={START_POSITIONS[minion.id] || [0, 0]}
-          />
-        ))}
+          {minions.map((minion) => (
+            <Minion
+              key={minion.id}
+              minion={minion}
+              startPosition={START_POSITIONS[minion.id] || [0, 0]}
+            />
+          ))}
 
-        {/* Particle effects */}
-        <MinionParticles />
-      </Canvas>
+          {/* Particle effects */}
+          <MinionParticles />
+        </Canvas>
       </ErrorBoundary>
 
       <ErrorBoundary label="Chat Panel">
@@ -75,7 +87,16 @@ export default function App() {
       />
 
       {dashboardOpen && (
-        <Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFE0B2", fontSize: 16 }}>Loading dashboard...</div>}>
+        <Suspense fallback={<div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(26, 20, 16, 0.8)",
+          backdropFilter: "blur(8px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#C8A35A",
+          fontSize: 16,
+          fontFamily: "'Instrument Serif', Georgia, serif",
+          fontStyle: "italic",
+        }}>Loading dashboard...</div>}>
           <Dashboard onClose={() => setDashboardOpen(false)} />
         </Suspense>
       )}

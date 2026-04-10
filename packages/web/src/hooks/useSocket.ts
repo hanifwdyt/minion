@@ -81,6 +81,17 @@ export function useSocket() {
     socket.on("activity:history", (events: any[]) => setActivityEvents(events));
     socket.on("activity:new", (event: any) => addActivity(event));
 
+    // Forward task events to window for TaskProgress component
+    socket.on("task:start", (data: any) => {
+      window.dispatchEvent(new CustomEvent("task:start", { detail: data }));
+    });
+    socket.on("task:step", (data: any) => {
+      window.dispatchEvent(new CustomEvent("task:step", { detail: data }));
+    });
+    socket.on("task:done", (data: any) => {
+      window.dispatchEvent(new CustomEvent("task:done", { detail: data }));
+    });
+
     socket.on("disconnect", () => {
       setConnected(false);
       toast("error", "Disconnected — reconnecting...");

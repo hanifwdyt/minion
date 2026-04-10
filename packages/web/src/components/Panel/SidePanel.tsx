@@ -3,6 +3,8 @@ import { useStore } from "../../store";
 import { ChatPanel } from "./ChatPanel";
 import { PromptInput } from "./PromptInput";
 import { ChatSearch, exportChatMarkdown } from "./ChatSearch";
+import { TaskProgress } from "./TaskProgress";
+import { colors, fonts, fontSize, spacing, radius, glass, transition, shadows } from "../../styles/tokens";
 import type { ChatMessage } from "../../types";
 
 interface SidePanelProps {
@@ -15,11 +17,97 @@ const BALAI_MINION = {
   id: "balai",
   name: "Balai Desa",
   role: "Shared Channel — Tim Punakawan",
-  color: "#5D4037",
+  color: colors.gold,
   status: "idle" as const,
 };
 
+// Map minion IDs to their token colors
+const MINION_COLORS: Record<string, string> = {
+  semar: colors.semar,
+  gareng: colors.gareng,
+  petruk: colors.petruk,
+  bagong: colors.bagong,
+  balai: colors.gold,
+};
+
+function getMinionColor(id: string, fallback?: string): string {
+  return MINION_COLORS[id] || fallback || colors.gold;
+}
+
+// Inject global keyframes once
+const STYLE_TAG_ID = "side-panel-keyframes";
+function ensureKeyframes() {
+  if (typeof document === "undefined" || document.getElementById(STYLE_TAG_ID)) return;
+  const style = document.createElement("style");
+  style.id = STYLE_TAG_ID;
+  style.textContent = `
+    @keyframes sp-statusRingSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes sp-statusPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(90, 158, 111, 0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(90, 158, 111, 0); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function ActionButton({
+  onClick,
+  ariaLabel,
+  title,
+  children,
+  variant = "default",
+}: {
+  onClick: () => void;
+  ariaLabel: string;
+  title?: string;
+  children: React.ReactNode;
+  variant?: "default" | "danger";
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  const bgDefault = hovered ? colors.surfaceGlass : "rgba(255,255,255,0.04)";
+  const bgDanger = hovered ? colors.errorBg : "rgba(199, 84, 80, 0.06)";
+  const borderDefault = hovered ? colors.glassBorder : "rgba(255,255,255,0.06)";
+  const borderDanger = hovered ? colors.errorBorder : "rgba(199, 84, 80, 0.1)";
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={ariaLabel}
+      title={title}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: variant === "danger" ? bgDanger : bgDefault,
+        border: `1px solid ${variant === "danger" ? borderDanger : borderDefault}`,
+        color: variant === "danger" ? colors.error : colors.textMuted,
+        borderRadius: radius.md,
+        padding: `${spacing.xs + 2}px ${spacing.sm + 2}px`,
+        cursor: "pointer",
+        fontSize: fontSize.sm,
+        fontFamily: fonts.sans,
+        fontWeight: 500,
+        lineHeight: 1,
+        minWidth: 34,
+        minHeight: 34,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: `all ${transition.fast}`,
+        transform: hovered ? "scale(1.08)" : "scale(1)",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function SidePanel({ onSendPrompt, onStop, onClearChat }: SidePanelProps) {
+  ensureKeyframes();
+
   const { minions, selectedMinionId, panelOpen, selectMinion, chatMessages, addChatMessage, connected } = useStore();
   const isBalai = selectedMinionId === "balai";
   const minion = isBalai ? BALAI_MINION : minions.find((m) => m.id === selectedMinionId);
@@ -73,6 +161,7 @@ export function SidePanel({ onSendPrompt, onStop, onClearChat }: SidePanelProps)
 
   const isWorking = isBalai ? anyWorking : minion?.status === "working";
   const [searchOpen, setSearchOpen] = useState(false);
+  const minionColor = minion ? getMinionColor(minion.id, minion.color) : colors.gold;
 
   return (
     <aside
@@ -81,109 +170,183 @@ export function SidePanel({ onSendPrompt, onStop, onClearChat }: SidePanelProps)
       className="side-panel"
       style={{
         position: "fixed",
-        top: 0, right: 0,
-        width: "420px",
+        top: 0,
+        right: 0,
+        width: 420,
         height: "100vh",
-        background: "#FFF8F0",
-        borderLeft: "2px solid #DAA520",
+        ...glass.panel,
+        background: colors.glassBg,
+        borderLeft: `1px solid ${colors.glassBorder}`,
         transform: panelOpen ? "translateX(0)" : "translateX(100%)",
-        transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        transition: `transform ${transition.spring}`,
         display: "flex",
         flexDirection: "column",
         zIndex: 100,
-        boxShadow: panelOpen ? "-4px 0 20px rgba(0,0,0,0.1)" : "none",
+        boxShadow: panelOpen ? `${shadows.xl}, ${shadows.glow}` : "none",
       }}
     >
       {/* Header */}
       <div style={{
-        padding: "14px 20px",
-        borderBottom: "1px solid #E8E8E8",
+        padding: `${spacing.lg}px ${spacing.xl}px`,
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        background: "#FFFFFF",
+        position: "relative",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div
-            aria-hidden="true"
-            style={{
-              width: 36, height: 36, borderRadius: "50%",
-              background: minion?.color || "#ccc",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "white", fontWeight: 800, fontSize: "14px",
-            }}
-          >
-            {isBalai ? "🏛" : minion?.name?.[0] || "?"}
+        <div style={{ display: "flex", alignItems: "center", gap: spacing.md }}>
+          {/* Avatar with animated status ring */}
+          <div style={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
+            {/* Status ring — animated when working */}
+            <div style={{
+              position: "absolute",
+              inset: -3,
+              borderRadius: radius.full,
+              border: `2px solid ${isWorking ? colors.working : "transparent"}`,
+              borderTopColor: isWorking ? "transparent" : undefined,
+              animation: isWorking ? "sp-statusRingSpin 1.2s linear infinite" : "none",
+              transition: `border-color ${transition.normal}`,
+            }} />
+            {/* Pulse ring for working state */}
+            {isWorking && (
+              <div style={{
+                position: "absolute",
+                inset: -3,
+                borderRadius: radius.full,
+                animation: "sp-statusPulse 2s ease-in-out infinite",
+              }} />
+            )}
+            {/* Avatar circle */}
+            <div style={{
+              width: 44,
+              height: 44,
+              borderRadius: radius.full,
+              background: isBalai
+                ? `linear-gradient(135deg, ${colors.goldDim}, ${colors.gold})`
+                : `linear-gradient(135deg, ${minionColor}cc, ${minionColor})`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: colors.text,
+              fontWeight: 800,
+              fontSize: isBalai ? fontSize.lg : fontSize.md,
+              fontFamily: fonts.display,
+              boxShadow: `0 0 12px ${minionColor}33`,
+            }}>
+              {isBalai ? "B" : minion?.name?.[0] || "?"}
+            </div>
+            {/* Status dot */}
+            <div style={{
+              position: "absolute",
+              bottom: 1,
+              right: 1,
+              width: 10,
+              height: 10,
+              borderRadius: radius.full,
+              background: isWorking
+                ? colors.working
+                : minion?.status === "error"
+                ? colors.error
+                : colors.textLight,
+              border: `2px solid ${colors.bg}`,
+            }} />
           </div>
+
+          {/* Name & role */}
           <div>
-            <h2 style={{ fontWeight: 700, fontSize: "15px", color: "#333", margin: 0 }}>
+            <h2 style={{
+              fontFamily: isBalai ? fonts.display : fonts.display,
+              fontWeight: 400,
+              fontSize: isBalai ? fontSize.xl : fontSize.lg,
+              color: colors.text,
+              margin: 0,
+              letterSpacing: isBalai ? "0.02em" : 0,
+              fontStyle: isBalai ? "italic" : "normal",
+            }}>
               {minion?.name ?? "Select a minion"}
             </h2>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span
-                aria-label={isWorking ? "Working" : "Idle"}
-                style={{
-                  width: 7, height: 7, borderRadius: "50%",
-                  background: isWorking ? "#2ecc71" : minion?.status === "error" ? "#e74c3c" : "#bbb",
-                  display: "inline-block",
-                }}
-              />
-              <span style={{ fontSize: "12px", color: "#666" }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: spacing.xs,
+              marginTop: 2,
+            }}>
+              <span style={{
+                fontSize: fontSize.xs,
+                color: isWorking ? colors.working : colors.textMuted,
+                fontFamily: fonts.sans,
+                transition: `color ${transition.fast}`,
+              }}>
                 {isBalai
                   ? anyWorking ? "Tim lagi nyambut gawe..." : minion?.role
                   : isWorking ? "Nyambut gawe..." : minion?.role || ""}
               </span>
               {messageCount > 0 && (
-                <span style={{ fontSize: "11px", color: "#999" }}>· {messageCount} messages</span>
+                <span style={{
+                  fontSize: fontSize.xs,
+                  color: colors.textLight,
+                  fontFamily: fonts.mono,
+                }}>
+                  · {messageCount}
+                </span>
               )}
             </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "6px" }}>
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: spacing.xs }}>
           {minion && messages.length > 0 && (
-            <button
+            <ActionButton
               onClick={() => setSearchOpen(!searchOpen)}
-              aria-label="Search messages"
+              ariaLabel="Search messages"
               title="Search"
-              style={headerBtnStyle}
             >
-              🔍
-            </button>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </ActionButton>
           )}
           {minion && messages.length > 0 && !isWorking && (
-            <button
+            <ActionButton
               onClick={() => { if (confirm("Clear chat history?")) onClearChat(isBalai ? "balai" : minion.id); }}
-              aria-label="Clear chat history"
+              ariaLabel="Clear chat history"
               title="Clear chat"
-              style={headerBtnStyle}
             >
-              🗑
-            </button>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </ActionButton>
           )}
           {!isBalai && isWorking && (
-            <button
+            <ActionButton
               onClick={() => minion && onStop(minion.id)}
-              aria-label="Stop minion"
-              style={{
-                background: "#FFF0F0", color: "#E53935",
-                border: "1px solid #FFCDD2", borderRadius: "8px",
-                padding: "6px 12px", cursor: "pointer",
-                fontSize: "12px", fontWeight: 600,
-              }}
+              ariaLabel="Stop minion"
+              title="Stop"
+              variant="danger"
             >
-              Stop
-            </button>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </ActionButton>
           )}
-          <button
+          <ActionButton
             onClick={() => selectMinion(null)}
-            aria-label="Close chat panel"
-            style={headerBtnStyle}
+            ariaLabel="Close chat panel"
+            title="Close"
           >
-            ×
-          </button>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </ActionButton>
         </div>
       </div>
+
+      {/* Gold accent line */}
+      <div style={{
+        height: 1,
+        background: `linear-gradient(to right, transparent, ${minionColor}44, ${minionColor}, ${minionColor}44, transparent)`,
+        margin: `0 ${spacing.xl}px`,
+      }} />
 
       {/* Search bar */}
       {searchOpen && minion && (
@@ -191,15 +354,20 @@ export function SidePanel({ onSendPrompt, onStop, onClearChat }: SidePanelProps)
           messages={messages}
           onClose={() => setSearchOpen(false)}
           onExport={() => exportChatMarkdown(messages, minion.name)}
-          accentColor={minion.color}
+          accentColor={minionColor}
         />
+      )}
+
+      {/* Task progress */}
+      {minion && isWorking && (
+        <TaskProgress minionId={isBalai ? "balai" : minion.id} />
       )}
 
       {/* Chat messages */}
       {minion && (
         <ChatPanel
           messages={messages}
-          accentColor={minion.color}
+          accentColor={minionColor}
           isWorking={isWorking || false}
           minionName={isBalai ? "Tim Punakawan" : minion.name}
         />
@@ -211,7 +379,7 @@ export function SidePanel({ onSendPrompt, onStop, onClearChat }: SidePanelProps)
           onSubmit={(prompt) => onSendPrompt(isBalai ? "balai" : minion.id, prompt)}
           onCommand={handleCommand}
           disabled={!connected || (!isBalai && isWorking)}
-          accentColor={minion.color}
+          accentColor={minionColor}
           placeholder={
             !connected ? "Offline — waiting for connection..."
             : isWorking && !isBalai ? "Working on it..."
@@ -222,19 +390,3 @@ export function SidePanel({ onSendPrompt, onStop, onClearChat }: SidePanelProps)
     </aside>
   );
 }
-
-const headerBtnStyle: React.CSSProperties = {
-  background: "#F5F5F5",
-  border: "1px solid #E0E0E0",
-  color: "#666",
-  borderRadius: "8px",
-  padding: "6px 10px",
-  cursor: "pointer",
-  fontSize: "16px",
-  lineHeight: 1,
-  minWidth: "32px",
-  minHeight: "32px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
