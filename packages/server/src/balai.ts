@@ -4,6 +4,14 @@ import { Server } from "socket.io";
 
 const BALAI_ID = "balai";
 
+// Peer review map: who reviews whose code (no self-review)
+const REVIEWER_MAP: Record<string, string> = {
+  semar:  "petruk",
+  petruk: "bagong",
+  gareng: "semar",
+  bagong: "gareng",
+};
+
 // Semar's delegation prompt — analyzes user request and picks the right minion
 const DELEGATION_PROMPT = `Lo adalah Semar, tetua bijak Punakawan. Lo baru dapet request dari user di Balai Desa (shared channel).
 
@@ -98,7 +106,8 @@ export class BalaiDesa {
     prompt: string,
     workdir: string,
     originalPrompt: string,
-    env?: Record<string, string>
+    env?: Record<string, string>,
+    options?: { _isReview?: boolean; _isFix?: boolean }
   ) {
     const config = this.minionConfigs.find((m) => m.id === minionId);
     if (!config) return;
@@ -117,9 +126,19 @@ export class BalaiDesa {
     // Create a wrapper that forwards minion responses to balai channel
     const balaiPrefix = `**${config.name}:** `;
 
+    // Track whether any code was written during this task
+    let codeWasModified = false;
+    let lastAssistantOutput = "";
+
     // Listen for this minion's chat events and mirror to balai
     const chatHandler = (data: any) => {
       if (data.minionId === minionId) {
+        if (data.message.role === "tool" && (data.message.toolName === "Edit" || data.message.toolName === "Write")) {
+          codeWasModified = true;
+        }
+        if (data.message.role === "assistant" && data.message.content) {
+          lastAssistantOutput = data.message.content;
+        }
         const balaiMsg = {
           ...data.message,
           id: `balai-${data.message.id}`,
@@ -136,6 +155,7 @@ export class BalaiDesa {
 
     const deltaHandler = (data: any) => {
       if (data.minionId === minionId) {
+        if (data.content) lastAssistantOutput = data.content;
         this.io.emit("minion:chat:delta", {
           minionId: BALAI_ID,
           messageId: `balai-${data.messageId}`,
@@ -149,6 +169,11 @@ export class BalaiDesa {
         this.claude.removeListener("chat", chatHandler);
         this.claude.removeListener("chat:delta", deltaHandler);
         this.claude.removeListener("done", doneHandler);
+
+        // Auto peer-review: only if code was written and this isn't already a review/fix task
+        if (codeWasModified && !options?._isReview && !options?._isFix) {
+          this.triggerAutoReview(minionId, lastAssistantOutput, workdir, env);
+        }
       }
     };
 
@@ -164,6 +189,7 @@ export class BalaiDesa {
       allowedTools: config.allowedTools,
       maxTurns: config.maxTurns,
       env,
+      ...options,
     });
   }
 
@@ -328,6 +354,7 @@ export class BalaiDesa {
 
     // Track last assistant message for context passing to next step
     let lastAssistantMessage = "";
+    let codeWasModified = false;
 
     // Mirror responses to balai
     const balaiPrefix = `**${config.name}:** `;
@@ -336,6 +363,9 @@ export class BalaiDesa {
         // Capture assistant messages for context passing
         if (data.message.role === "assistant" && data.message.content) {
           lastAssistantMessage = data.message.content;
+        }
+        if (data.message.role === "tool" && (data.message.toolName === "Edit" || data.message.toolName === "Write")) {
+          codeWasModified = true;
         }
 
         const balaiMsg = {
@@ -402,7 +432,11 @@ export class BalaiDesa {
           this.io.emit("minion:chat", { minionId: BALAI_ID, message: skipMsg });
           this.runPipeline(steps, workdir, stepIndex + 1, 0, stepOutput);
         } else {
-          // Success — next step with context from this step
+          // Success — trigger auto peer-review if code was written in this step
+          if (codeWasModified) {
+            this.triggerAutoReview(step.minionId, stepOutput, workdir);
+          }
+          // Next step with context from this step
           this.runPipeline(steps, workdir, stepIndex + 1, 0, stepOutput);
         }
       }
@@ -430,5 +464,169 @@ export class BalaiDesa {
         GITLAB_API: process.env.GITLAB_API || "",
       } : undefined,
     });
+  }
+
+  // ── Peer Review ─────────────────────────────────────────────
+
+  /**
+   * Triggered after a minion finishes a task where code was written.
+   * Flow: reviewer reviews → if issues found → coder fixes.
+   */
+  triggerAutoReview(
+    coderMinionId: string,
+    coderOutput: string,
+    workdir: string,
+    env?: Record<string, string>
+  ) {
+    const reviewerMinionId = REVIEWER_MAP[coderMinionId];
+    if (!reviewerMinionId) return;
+
+    const coderConfig    = this.minionConfigs.find((m) => m.id === coderMinionId);
+    const reviewerConfig = this.minionConfigs.find((m) => m.id === reviewerMinionId);
+    if (!coderConfig || !reviewerConfig) return;
+
+    this.emitBalai(`_Auto peer-review: **${reviewerConfig.name}** review kode **${coderConfig.name}**..._`);
+
+    let reviewFeedback = "";
+    const reviewPrefix = `**${reviewerConfig.name} (review):** `;
+
+    const reviewChatHandler = (data: any) => {
+      if (data.minionId !== reviewerMinionId) return;
+      if (data.message.role === "assistant" && data.message.content) {
+        reviewFeedback = data.message.content;
+      }
+      const balaiMsg = {
+        ...data.message,
+        id: `balai-${data.message.id}`,
+        minionId: BALAI_ID,
+        content: data.message.role === "assistant"
+          ? reviewPrefix + data.message.content
+          : data.message.content,
+      };
+      this.chatStore.add(BALAI_ID, balaiMsg);
+      this.io.emit("minion:chat", { minionId: BALAI_ID, message: balaiMsg });
+    };
+
+    const reviewDeltaHandler = (data: any) => {
+      if (data.minionId !== reviewerMinionId) return;
+      if (data.content) reviewFeedback = data.content;
+      this.io.emit("minion:chat:delta", {
+        minionId: BALAI_ID,
+        messageId: `balai-${data.messageId}`,
+        content: reviewPrefix + data.content,
+      });
+    };
+
+    const reviewDoneHandler = (data: any) => {
+      if (data.minionId !== reviewerMinionId) return;
+      this.claude.removeListener("chat", reviewChatHandler);
+      this.claude.removeListener("chat:delta", reviewDeltaHandler);
+      this.claude.removeListener("done", reviewDoneHandler);
+
+      if (!reviewFeedback.trim()) {
+        this.emitBalai(`_Review selesai — tidak ada feedback._`);
+        return;
+      }
+
+      // LGTM check — skip fix step if reviewer has no issues
+      const lgtmPatterns = /\b(lgtm|looks? good|no issues?|tidak ada masalah|oke semua|sudah bagus)\b/i;
+      if (lgtmPatterns.test(reviewFeedback)) {
+        this.emitBalai(`_**${reviewerConfig.name}**: LGTM — tidak perlu fix._`);
+        return;
+      }
+
+      // Trigger fix step on original coder
+      this.emitBalai(`_**${coderConfig.name}** mulai benerin berdasarkan feedback review..._`);
+
+      const fixPrompt = `## Peer Review Feedback dari ${reviewerConfig.name}
+
+${reviewFeedback}
+
+---
+
+Berdasarkan feedback di atas, perbaiki kode yang tadi lo tulis. Fokus ke poin-poin konkret yang disebutkan reviewer. Kalau ada yang lo tidak setuju, jelaskan alasannya dulu sebelum memutuskan.`;
+
+      const fixPrefix = `**${coderConfig.name} (fix):** `;
+
+      const fixChatHandler = (data: any) => {
+        if (data.minionId !== coderMinionId) return;
+        const balaiMsg = {
+          ...data.message,
+          id: `balai-${data.message.id}`,
+          minionId: BALAI_ID,
+          content: data.message.role === "assistant"
+            ? fixPrefix + data.message.content
+            : data.message.content,
+        };
+        this.chatStore.add(BALAI_ID, balaiMsg);
+        this.io.emit("minion:chat", { minionId: BALAI_ID, message: balaiMsg });
+      };
+
+      const fixDeltaHandler = (data: any) => {
+        if (data.minionId !== coderMinionId) return;
+        this.io.emit("minion:chat:delta", {
+          minionId: BALAI_ID,
+          messageId: `balai-${data.messageId}`,
+          content: fixPrefix + data.content,
+        });
+      };
+
+      const fixDoneHandler = (data: any) => {
+        if (data.minionId !== coderMinionId) return;
+        this.claude.removeListener("chat", fixChatHandler);
+        this.claude.removeListener("chat:delta", fixDeltaHandler);
+        this.claude.removeListener("done", fixDoneHandler);
+        this.emitBalai(`_Cycle selesai: ${coderConfig.name} → ${reviewerConfig.name} (review) → ${coderConfig.name} (fix)._`);
+      };
+
+      this.claude.on("chat", fixChatHandler);
+      this.claude.on("chat:delta", fixDeltaHandler);
+      this.claude.on("done", fixDoneHandler);
+
+      const coderSystemPrompt = this.loadSystemPrompt(coderConfig);
+      this.claude.runPrompt(coderMinionId, fixPrompt, workdir, {
+        systemPrompt: coderSystemPrompt,
+        allowedTools: coderConfig.allowedTools,
+        maxTurns: coderConfig.maxTurns,
+        env,
+        _isFix: true,
+      });
+    };
+
+    this.claude.on("chat", reviewChatHandler);
+    this.claude.on("chat:delta", reviewDeltaHandler);
+    this.claude.on("done", reviewDoneHandler);
+
+    const reviewPrompt = `## Peer Code Review — kode dari ${coderConfig.name}
+
+${coderOutput.slice(0, 3000)}
+
+---
+
+Review kodenya. Cek: correctness, readability, edge cases, security, best practices.
+
+Kalau tidak ada masalah → bilang "LGTM" dengan jelas.
+Kalau ada masalah → jelaskan spesifik (file, baris, masalah, saran perbaikan).`;
+
+    const reviewerSystemPrompt = this.loadSystemPrompt(reviewerConfig);
+    this.claude.runPrompt(reviewerMinionId, reviewPrompt, workdir, {
+      systemPrompt: reviewerSystemPrompt,
+      allowedTools: reviewerConfig.allowedTools,
+      maxTurns: reviewerConfig.maxTurns,
+      env,
+      _isReview: true,
+    });
+  }
+
+  private emitBalai(content: string) {
+    const msg = {
+      id: `balai-info-${Date.now()}`,
+      minionId: BALAI_ID,
+      role: "assistant" as const,
+      content,
+      timestamp: Date.now(),
+    };
+    this.chatStore.add(BALAI_ID, msg);
+    this.io.emit("minion:chat", { minionId: BALAI_ID, message: msg });
   }
 }

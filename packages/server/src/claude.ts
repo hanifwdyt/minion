@@ -24,11 +24,15 @@ interface RunOptions {
   maxTurns?: number;
   model?: string;
   env?: Record<string, string>;
+  _taskId?: string;   // internal: preserve taskId when dequeuing
+  _isReview?: boolean; // internal: this task is a peer review — don't trigger another review
+  _isFix?: boolean;   // internal: this task is a post-review fix — don't trigger another review
 }
 
 interface ClaudeSession {
   process: ChildProcess;
   minionId: string;
+  taskId: string;
   sessionId?: string;
   messageCounter: number;
   currentStreamId?: string;
@@ -38,6 +42,7 @@ interface ClaudeSession {
   workdir: string;
   options?: RunOptions;
   originalPrompt: string;
+  loopInterruptCount: number; // how many times we've interrupted this session for loop
 }
 
 export interface TaskStep {
@@ -61,13 +66,8 @@ interface QueuedTask {
   minionId: string;
   prompt: string;
   workdir: string;
-  options?: {
-    systemPrompt?: string;
-    allowedTools?: string;
-    maxTurns?: number;
-    model?: string;
-    env?: Record<string, string>;
-  };
+  taskId: string;
+  options?: RunOptions;
 }
 
 interface UsageStats {
@@ -113,9 +113,12 @@ export class ClaudeManager extends EventEmitter {
     prompt: string,
     workdir: string,
     options?: RunOptions
-  ) {
+  ): Promise<string> {
     const MAX_QUEUE = 10;
-    const IDLE_TIMEOUT = 3 * 60 * 1000; // 3 min idle = timeout (resets on activity)
+    const IDLE_TIMEOUT = 10 * 60 * 1000; // 10 min idle = timeout (resets on activity)
+
+    // Reuse taskId from options (when dequeuing) or generate a fresh one
+    const taskId = options?._taskId || `task-${minionId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
     // If minion is already working, queue the task
     if (this.sessions.has(minionId)) {
@@ -123,11 +126,12 @@ export class ClaudeManager extends EventEmitter {
       if (queue.length >= MAX_QUEUE) {
         this.emit("chat", {
           minionId,
+          taskId,
           message: { id: `queue-full-${Date.now()}`, minionId, role: "assistant", content: "Queue full (max 10). Wait for current tasks to finish.", timestamp: Date.now() },
         });
-        return;
+        return taskId;
       }
-      queue.push({ minionId, prompt, workdir, options });
+      queue.push({ minionId, prompt, workdir, taskId, options: { ...options, _taskId: taskId } });
       this.queues.set(minionId, queue);
       const queueLen = queue.length;
       console.log(`[claude] ${minionId} busy, queued task (${queueLen} in queue)`);
@@ -135,6 +139,7 @@ export class ClaudeManager extends EventEmitter {
       // Notify user about queued task
       this.emit("chat", {
         minionId,
+        taskId,
         message: {
           id: `queue-${minionId}-${Date.now()}`,
           minionId,
@@ -143,7 +148,7 @@ export class ClaudeManager extends EventEmitter {
           timestamp: Date.now(),
         },
       });
-      return;
+      return taskId;
     }
 
     const allowedTools = options?.allowedTools || "Read,Edit,Bash,Glob,Grep,Write";
@@ -191,8 +196,8 @@ export class ClaudeManager extends EventEmitter {
     });
 
     const session: ClaudeSession = {
-      process: proc, minionId, messageCounter: 0, lastActivity: Date.now(),
-      workdir, options, originalPrompt: prompt,
+      process: proc, minionId, taskId, messageCounter: 0, lastActivity: Date.now(),
+      workdir, options, originalPrompt: prompt, loopInterruptCount: 0,
     };
     this.sessions.set(minionId, session);
 
@@ -224,6 +229,8 @@ export class ClaudeManager extends EventEmitter {
             role: "assistant",
             content: `Idle timeout — no activity for ${Math.round(IDLE_TIMEOUT / 60000)} minutes. Stopping.`,
           });
+          // emit done with taskId so handlers can clean up properly
+          this.emit("done", { minionId, taskId: session.taskId, code: null });
           this.stop(minionId);
         }
       }, IDLE_TIMEOUT);
@@ -253,6 +260,7 @@ export class ClaudeManager extends EventEmitter {
     });
 
     proc.stderr?.on("data", (chunk: Buffer) => {
+      resetIdleTimeout(); // stderr activity = Claude is processing, reset timer
       const text = chunk.toString();
       if (!text.includes("Debugger") && !text.includes("ExperimentalWarning")) {
         console.log(`[claude:${minionId}:stderr] ${text.trim()}`);
@@ -289,7 +297,7 @@ export class ClaudeManager extends EventEmitter {
         this.taskProgress.delete(minionId);
       }
 
-      this.emit("done", { minionId, code, traceId: trace?.id });
+      this.emit("done", { minionId, taskId, code, traceId: trace?.id });
 
       // Process next queued task or go idle
       if (!this.processNextInQueue(minionId)) {
@@ -308,6 +316,8 @@ export class ClaudeManager extends EventEmitter {
       this.emit("status", { minionId, status: "error" });
       this.sessions.delete(minionId);
     });
+
+    return taskId;
   }
 
   private handleStreamEvent(minionId: string, event: any, session: ClaudeSession) {
@@ -322,6 +332,7 @@ export class ClaudeManager extends EventEmitter {
         // Create initial empty message
         this.emit("chat", {
           minionId,
+          taskId: session.taskId,
           message: {
             id: session.currentStreamId,
             minionId,
@@ -337,6 +348,7 @@ export class ClaudeManager extends EventEmitter {
       if (session.currentStreamId) {
         this.emit("chat:delta", {
           minionId,
+          taskId: session.taskId,
           messageId: session.currentStreamId,
           content: session.currentStreamText,
         });
@@ -377,15 +389,53 @@ export class ClaudeManager extends EventEmitter {
               // Loop detection
               const repeatCount = this.traces.checkToolLoop(minionId, block.name, JSON.stringify(block.input).slice(0, 100));
               if (repeatCount >= 5) {
+                this.traces.addStep(minionId, { type: "error", content: `Loop detected (${repeatCount}x): ${block.name}` });
+
+                if (session.loopInterruptCount >= 2) {
+                  // Already interrupted twice for loop — hard stop to prevent infinite cycle
+                  this.emitChat(minionId, session, {
+                    role: "assistant",
+                    content: `Loop tidak bisa diselesaikan setelah ${session.loopInterruptCount} percobaan recovery. Stopping.`,
+                  });
+                  this.stop(minionId);
+                  return;
+                }
+
+                // Interrupt with structured thinking prompt — force reflection before retrying
+                session.loopInterruptCount++;
                 this.emitChat(minionId, session, {
                   role: "assistant",
-                  content: "Loop detected (5x same operation). Stopping.",
+                  content: `Loop terdeteksi (${repeatCount}x "${block.name}"). Masuk thinking mode untuk cari approach berbeda...`,
                 });
-                this.traces.addStep(minionId, { type: "error", content: "Hard stop: loop detected (5x)" });
-                this.stop(minionId);
+
+                const thinkingPrompt = `[LOOP RECOVERY — THINKING MODE]
+
+Lo tadi terjebak loop: tool "${block.name}" dipanggil ${repeatCount}x berturut-turut dengan input yang sama.
+
+Sebelum lanjut, lakukan structured thinking dulu:
+
+## 1. Diagnosa
+- Kenapa loop ini terjadi? Apa yang lo harapkan tapi tidak terjadi?
+- Apakah tool "${block.name}" memang tidak cocok untuk step ini?
+
+## 2. Goal sesungguhnya
+- Apa hasil akhir yang ingin dicapai dari task ini?
+- Apakah lo sudah terlalu fokus ke satu cara sampai lupa goalnya?
+
+## 3. Alternatif approach
+- Sebutkan 2-3 cara berbeda yang bisa mencapai goal yang sama
+- Pilih yang paling efisien dan langsung
+
+## 4. Eksekusi
+- Jalankan approach yang dipilih, jangan ulangi yang sudah gagal
+- Kalau semua approach tidak memungkinkan, jelaskan kenapa dan minta bantuan user
+
+Mulai dengan menulis hasil thinking lo di atas, lalu langsung eksekusi approach baru.`;
+
+                this.interrupt(minionId, thinkingPrompt);
                 return;
               } else if (repeatCount >= 3) {
-                this.traces.addStep(minionId, { type: "system", content: "Loop warning: 3x same tool call pattern" });
+                this.traces.addStep(minionId, { type: "system", content: `Loop warning: ${repeatCount}x same tool call pattern (${block.name})` });
               }
 
               this.emitChat(minionId, session, {
@@ -433,7 +483,7 @@ export class ClaudeManager extends EventEmitter {
       timestamp: Date.now(),
       toolName: msg.toolName,
     };
-    this.emit("chat", { minionId, message });
+    this.emit("chat", { minionId, taskId: session.taskId, message });
   }
 
   getUsageStats(): UsageStats {
