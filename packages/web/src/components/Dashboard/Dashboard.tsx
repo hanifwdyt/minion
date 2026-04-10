@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, type KeyboardEvent as ReactKe
 
 const API = "/api";
 
-type Tab = "minions" | "souls" | "context" | "integrations" | "usage" | "activity";
+type Tab = "minions" | "souls" | "context" | "integrations" | "usage" | "activity" | "proposals";
 
 interface MinionConfig {
   id: string;
@@ -61,6 +61,7 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
     { id: "integrations", label: "Integrations" },
     { id: "usage", label: "Usage" },
     { id: "activity", label: "Activity" },
+    { id: "proposals", label: "Proposals" },
   ];
 
   return (
@@ -133,6 +134,7 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
           {tab === "integrations" && <IntegrationsTab onError={setError} />}
           {tab === "usage" && <UsageTab />}
           {tab === "activity" && <ActivityTab />}
+          {tab === "proposals" && <ProposalsTab />}
         </div>
       </div>
     </div>
@@ -474,6 +476,160 @@ function ActivityTab() {
           <span style={{ color: "#666" }}>{e.summary}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// --- Proposals Tab ---
+function ProposalsTab() {
+  const [proposals, setProposals] = useState<any[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    apiFetch("/proposals").then(setProposals).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    load();
+    const iv = setInterval(load, 10000);
+    return () => clearInterval(iv);
+  }, [load]);
+
+  const handleAction = async (id: string, action: "approve" | "reject" | "done") => {
+    setLoading(id);
+    try {
+      await apiFetch(`/proposals/${id}/${action}`, { method: "POST" });
+      load();
+    } catch {}
+    setLoading(null);
+  };
+
+  const priorityColor: Record<string, string> = {
+    high: "#D32F2F",
+    medium: "#F57C00",
+    low: "#388E3C",
+  };
+
+  const statusIcon: Record<string, string> = {
+    pending: "⏳",
+    approved: "✅",
+    rejected: "❌",
+    done: "✔️",
+  };
+
+  const pending = proposals.filter((p) => p.status === "pending");
+  const others = proposals.filter((p) => p.status !== "pending" && p.id !== "init");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Pending proposals */}
+      {pending.length === 0 && others.length === 0 && (
+        <div style={{ color: "#999", textAlign: "center", padding: 40 }}>
+          No proposals yet. Breath system will generate improvement proposals overnight (9PM-6AM).
+        </div>
+      )}
+
+      {pending.length > 0 && (
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#5D4037", marginBottom: 4 }}>
+          Pending Approval ({pending.length})
+        </div>
+      )}
+
+      {pending.map((p) => (
+        <div key={p.id} style={{
+          border: "2px solid #FFE0B2", borderRadius: 10, overflow: "hidden",
+          background: "#FFFAF5",
+        }}>
+          <div
+            style={{
+              padding: "12px 16px", cursor: "pointer",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}
+            onClick={() => setExpanded(expanded === p.id ? null : p.id)}
+          >
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                background: priorityColor[p.priority] || "#999", color: "white",
+                textTransform: "uppercase",
+              }}>
+                {p.priority || "medium"}
+              </span>
+              <span style={{ fontSize: 11, color: "#999", background: "#F0F0F0", padding: "2px 6px", borderRadius: 4 }}>
+                {p.category || "general"}
+              </span>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>{p.title}</span>
+            </div>
+            <span style={{ fontSize: 16 }}>{expanded === p.id ? "▲" : "▼"}</span>
+          </div>
+
+          {expanded === p.id && (
+            <div style={{ padding: "0 16px 16px" }}>
+              <div style={{
+                fontSize: 12, color: "#555", whiteSpace: "pre-wrap",
+                background: "#FFF", padding: 12, borderRadius: 8, marginBottom: 12,
+                border: "1px solid #EEE", lineHeight: 1.6,
+              }}>
+                {p.description || "No description"}
+              </div>
+
+              {p.estimatedImpact && (
+                <div style={{ fontSize: 11, color: "#388E3C", marginBottom: 12 }}>
+                  Expected impact: {p.estimatedImpact}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => handleAction(p.id, "approve")}
+                  disabled={loading === p.id}
+                  style={{
+                    padding: "8px 20px", borderRadius: 6, border: "none",
+                    background: "#388E3C", color: "white", fontWeight: 600,
+                    cursor: "pointer", fontSize: 12,
+                  }}
+                >
+                  {loading === p.id ? "Executing..." : "Approve & Execute"}
+                </button>
+                <button
+                  onClick={() => handleAction(p.id, "reject")}
+                  disabled={loading === p.id}
+                  style={{
+                    padding: "8px 20px", borderRadius: 6,
+                    border: "1px solid #DDD", background: "white", color: "#999",
+                    cursor: "pointer", fontSize: 12,
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Completed proposals */}
+      {others.length > 0 && (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#999", marginTop: 8 }}>
+            History
+          </div>
+          {others.map((p) => (
+            <div key={p.id} style={{
+              padding: "8px 16px", borderRadius: 8, background: "#F5F5F5",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              opacity: 0.7,
+            }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span>{statusIcon[p.status] || ""}</span>
+                <span style={{ fontSize: 12 }}>{p.title}</span>
+              </div>
+              <span style={{ fontSize: 10, color: "#999" }}>{p.status}</span>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

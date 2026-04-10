@@ -520,9 +520,52 @@ app.get("/api/proposals/pending", protect, (_req, res) => {
 });
 
 app.post("/api/proposals/:id/approve", protect, (req, res) => {
-  const ok = breathEngine.updateProposalStatus(String(req.params.id), "approved");
-  if (!ok) return res.status(404).json({ error: "Proposal not found" });
-  res.json({ ok: true, status: "approved" });
+  const proposalId = String(req.params.id);
+  const proposals = breathEngine.getProposals();
+  const proposal = proposals.find((p: any) => p.id === proposalId);
+  if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+
+  breathEngine.updateProposalStatus(proposalId, "approved");
+
+  // Auto-execute: spawn Semar to implement the approved proposal
+  const semarConfig = configStore.getMinion("semar");
+  if (semarConfig) {
+    const systemPrompt = configStore.loadSystemPrompt(semarConfig);
+    const knowledgeContext = memoryStore.buildKnowledgeContext();
+    const minionProjectDir = resolve(".");
+
+    const executePrompt = `[APPROVED PROPOSAL — EXECUTE]
+
+Proposal ID: ${proposal.id}
+Title: ${proposal.title}
+Description: ${proposal.description || ""}
+Category: ${proposal.category || "general"}
+Priority: ${proposal.priority || "medium"}
+
+Lo adalah Semar. Proposal ini udah di-approve sama user. Sekarang IMPLEMENT proposal ini.
+
+Kerjain di project minion sendiri (working directory = root project minion).
+
+Instruksi:
+1. Pahami apa yang diminta di proposal
+2. Implement perubahan yang diperlukan
+3. JANGAN run \`npm run build\` atau restart — user yang handle itu
+4. Setelah selesai, kasih summary perubahan yang lo buat
+5. Bilang ke user: "Perubahan udah ready. Jalanin \`npm run build && pm2 restart punakawan\` untuk apply."
+
+PENTING: Jangan modify file yang ga relevan. Fokus ke apa yang diminta proposal.`;
+
+    claude.runPrompt("semar", executePrompt, minionProjectDir, {
+      systemPrompt: (systemPrompt || "") + knowledgeContext,
+      allowedTools: semarConfig.allowedTools,
+      maxTurns: semarConfig.maxTurns,
+    });
+
+    // Notify via socket
+    io.emit("proposal:executing", { proposalId, title: proposal.title });
+  }
+
+  res.json({ ok: true, status: "approved", executing: true });
 });
 
 app.post("/api/proposals/:id/reject", protect, (req, res) => {
