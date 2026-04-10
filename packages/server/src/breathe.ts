@@ -236,7 +236,7 @@ export class BreathEngine {
     return this.getProposals().filter((p: any) => p.status === "pending");
   }
 
-  updateProposalStatus(proposalId: string, status: "approved" | "rejected" | "done"): boolean {
+  updateProposalStatus(proposalId: string, status: "approved" | "rejected" | "done" | "completed"): boolean {
     try {
       const path = resolve(import.meta.dirname, "../data/proposals.json");
       if (!existsSync(path)) return false;
@@ -245,6 +245,7 @@ export class BreathEngine {
       if (!proposal) return false;
       proposal.status = status;
       if (status === "approved") proposal.approvedAt = new Date().toISOString();
+      if (status === "completed" || status === "done") proposal.completedAt = new Date().toISOString();
       writeFileSync(path, JSON.stringify(proposals, null, 2));
       return true;
     } catch {

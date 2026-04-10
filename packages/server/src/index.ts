@@ -569,6 +569,16 @@ Instruksi:
 
 PENTING: Jangan modify file yang ga relevan. Fokus ke apa yang diminta proposal.`;
 
+    // Mark proposal as completed when Semar finishes
+    const proposalDoneHandler = (data: any) => {
+      if (data.minionId === "semar") {
+        claude.removeListener("done", proposalDoneHandler);
+        breathEngine.updateProposalStatus(proposalId, "completed");
+        io.emit("proposal:completed", { proposalId, title: proposal.title });
+      }
+    };
+    claude.once("done", proposalDoneHandler);
+
     claude.runPrompt("semar", executePrompt, minionProjectDir, {
       systemPrompt: (systemPrompt || "") + knowledgeContext,
       allowedTools: semarConfig.allowedTools,

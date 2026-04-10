@@ -19,7 +19,7 @@
   {
     "id": "prop-1744243200002",
     "title": "Bikin CLAUDE.md di ide-phoenix",
-    "description": "Petruk timeout saat mengerjakan task 'tambah filter search' di ide-phoenix (600s, 60 tool calls). Sebagian besar waktu dihabiskan untuk orientasi project — memahami struktur, lokasi controller, naming conventions.\n\nCurrent state: Tidak ada CLAUDE.md di repo ide-phoenix. Agent harus explore dari scratch setiap task baru.\n\nProposed: Buat CLAUDE.md di root ide-phoenix yang berisi: struktur direktori penting, naming conventions, cara jalankan test, lokasi controller/model utama, alur feature flag.\n\nExpected impact: -40% tool calls per task implementasi. Task orientasi dari ~20 tool calls ke ~3 tool calls.",
+    "description": "Petruk timeout saat mengerjakan task 'tambah filter search' di ide-phoenix (600s, 60 tool calls). Sebagian besar waktu dihabiskan untuk orientasi project \u2014 memahami struktur, lokasi controller, naming conventions.\n\nCurrent state: Tidak ada CLAUDE.md di repo ide-phoenix. Agent harus explore dari scratch setiap task baru.\n\nProposed: Buat CLAUDE.md di root ide-phoenix yang berisi: struktur direktori penting, naming conventions, cara jalankan test, lokasi controller/model utama, alur feature flag.\n\nExpected impact: -40% tool calls per task implementasi. Task orientasi dari ~20 tool calls ke ~3 tool calls.",
     "priority": "high",
     "category": "context",
     "estimatedImpact": "-40% tool calls untuk implementasi tasks di ide-phoenix",
@@ -31,7 +31,7 @@
   {
     "id": "prop-1744243200003",
     "title": "Task scoping: agent minta klarifikasi untuk task ambigu",
-    "description": "Semar gagal di task 'bikin invoice PDF + tambah ke app menu' (50 tool calls, 213s, failed). Task membutuhkan library yang belum terinstall dan scope-nya tidak jelas.\n\nCurrent state: Agent langsung mulai mengerjakan task besar tanpa tanya scope atau dependensi. Kalo stuck di tengah, baru stop dan report — setelah banyak effort terbuang.\n\nProposed: Tambah instruksi di soul: untuk task yang estimasi >10 tool calls, agent WAJIB tanya scope dulu. Contoh: 'Ini butuh library X yang belum ada. Kita install dulu atau pakai alternatif lain?'\n\nExpected impact: Kurangi failed tasks dari task ambigu. Save waktu user karena tau blockers di awal.",
+    "description": "Semar gagal di task 'bikin invoice PDF + tambah ke app menu' (50 tool calls, 213s, failed). Task membutuhkan library yang belum terinstall dan scope-nya tidak jelas.\n\nCurrent state: Agent langsung mulai mengerjakan task besar tanpa tanya scope atau dependensi. Kalo stuck di tengah, baru stop dan report \u2014 setelah banyak effort terbuang.\n\nProposed: Tambah instruksi di soul: untuk task yang estimasi >10 tool calls, agent WAJIB tanya scope dulu. Contoh: 'Ini butuh library X yang belum ada. Kita install dulu atau pakai alternatif lain?'\n\nExpected impact: Kurangi failed tasks dari task ambigu. Save waktu user karena tau blockers di awal.",
     "priority": "medium",
     "category": "workflow",
     "estimatedImpact": "Kurangi failed tasks dan wasted effort untuk task ambigu",
@@ -42,35 +42,38 @@
   },
   {
     "id": "prop-1775797386001",
-    "title": "Fix proposals.json tracking — mark completed setelah eksekusi",
+    "title": "Fix proposals.json tracking \u2014 mark completed setelah eksekusi",
     "description": "Proposals tetap status 'approved' meskipun sudah dieksekusi. Ini bikin tracking jadi tidak akurat dan breath agent tidak bisa tahu mana yang sudah beres.\n\nCurrent state: Setelah Semar eksekusi proposal, status tidak berubah dari 'approved' ke 'completed'. Dari 3 proposal yang dieksekusi, semuanya masih 'approved'.\n\nProposed: Tambah step di proposal execution flow: setelah task selesai, update status ke 'completed' via Python script. Atau tambah field 'executedAt' + 'executionResult'.\n\nExpected impact: Breath agent bisa fokus pada proposal yang benar-benar belum dikerjakan. Kurangi re-analysis yang sia-sia.",
     "priority": "medium",
     "category": "workflow",
     "estimatedImpact": "Breath lebih akurat, tidak perlu investigasi manual mana yang sudah done",
     "createdAt": "2026-04-10T05:00:00.000Z",
-    "status": "approved",
-    "approvedAt": "2026-04-10T05:08:27.808Z"
+    "status": "completed",
+    "approvedAt": "2026-04-10T05:08:27.808Z",
+    "completedAt": "2026-04-10T06:45:49.224913Z"
   },
   {
     "id": "prop-1775797386002",
-    "title": "Petruk task state — simpan context ke file saat task selesai",
-    "description": "Ketika user bilang 'lanjutin dong' atau 'coba kerjain lagi', Petruk kehilangan context task sebelumnya karena percakapan baru = fresh context.\n\nCurrent state: 'lanjutin dong' → Petruk failed (1 step), karena tidak tahu apa yang harus dilanjutkan. 67% success rate.\n\nProposed: Setiap kali Petruk menyelesaikan atau memulai task besar, simpan ringkasan state ke data/petruk-state.json: {lastTask, lastFile, lastStep, blockers}. Ketika ada 'lanjutkan', instruksikan Petruk untuk baca file ini dulu.\n\nExpected impact: Task continuation dari 0% ke >70% success. Kurangi frustasi user.",
+    "title": "Petruk task state \u2014 simpan context ke file saat task selesai",
+    "description": "Ketika user bilang 'lanjutin dong' atau 'coba kerjain lagi', Petruk kehilangan context task sebelumnya karena percakapan baru = fresh context.\n\nCurrent state: 'lanjutin dong' \u2192 Petruk failed (1 step), karena tidak tahu apa yang harus dilanjutkan. 67% success rate.\n\nProposed: Setiap kali Petruk menyelesaikan atau memulai task besar, simpan ringkasan state ke data/petruk-state.json: {lastTask, lastFile, lastStep, blockers}. Ketika ada 'lanjutkan', instruksikan Petruk untuk baca file ini dulu.\n\nExpected impact: Task continuation dari 0% ke >70% success. Kurangi frustasi user.",
     "priority": "high",
     "category": "workflow",
     "estimatedImpact": "Petruk success rate dari 67% ke >80%",
     "createdAt": "2026-04-10T05:00:00.000Z",
-    "status": "approved",
-    "approvedAt": "2026-04-10T05:08:03.867Z"
+    "status": "completed",
+    "approvedAt": "2026-04-10T05:08:03.867Z",
+    "completedAt": "2026-04-10T06:45:49.224913Z"
   },
   {
     "id": "prop-1775797386003",
-    "title": "Semar UI tasks — context limit protocol",
+    "title": "Semar UI tasks \u2014 context limit protocol",
     "description": "Semar UI rewrite task failed (334s, 40 tool calls) karena exhausted context. Penyebab: pakai Agent subagent untuk explore + banyak Read calls sebelum mulai coding.\n\nCurrent state: Tidak ada rule yang mencegah Semar spawn Agent subagent untuk UI exploration. Task besar dikerjakan dalam satu pass sampai context habis.\n\nProposed: Tambah ke soul/instruksi Semar: untuk task UI yang menyentuh >3 komponen, WAJIB bikin plan dulu (list file yang akan diubah, perubahan per file) sebelum mulai coding. Batasi Agent subagent usage untuk UI tasks.\n\nExpected impact: Kurangi failed UI tasks. Semar dari 80% ke 90%+ success.",
     "priority": "medium",
     "category": "workflow",
     "estimatedImpact": "Semar UI task success rate naik, kurangi wasted 300s per failed task",
     "createdAt": "2026-04-10T05:00:00.000Z",
-    "status": "approved",
-    "approvedAt": "2026-04-10T05:07:46.722Z"
+    "status": "completed",
+    "approvedAt": "2026-04-10T05:07:46.722Z",
+    "completedAt": "2026-04-10T06:45:49.224913Z"
   }
 ]

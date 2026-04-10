@@ -2998,5 +2998,313 @@
     "role": "user",
     "content": "halo",
     "timestamp": 1775797790047
+  },
+  {
+    "id": "user-1775798986341",
+    "minionId": "semar",
+    "role": "user",
+    "content": "halo",
+    "timestamp": 1775798986341
+  },
+  {
+    "id": "user-1775801389338",
+    "minionId": "semar",
+    "role": "user",
+    "content": "halo",
+    "timestamp": 1775801389338
+  },
+  {
+    "id": "user-1775802355618",
+    "minionId": "semar",
+    "role": "user",
+    "content": "haloo",
+    "timestamp": 1775802355618
+  },
+  {
+    "id": "user-1775802525096",
+    "minionId": "semar",
+    "role": "user",
+    "content": "knp u gabales chat gua",
+    "timestamp": 1775802525096
+  },
+  {
+    "id": "user-1775803387558",
+    "minionId": "semar",
+    "role": "user",
+    "content": "halo",
+    "timestamp": 1775803387558
+  },
+  {
+    "id": "semar-1-1775803390771",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Halo, nak. Ada yang bisa Semar bantu hari ini?",
+    "timestamp": 1775803390771
+  },
+  {
+    "id": "user-1775803408918",
+    "minionId": "semar",
+    "role": "user",
+    "content": "akhirnya u balik jg. td u ga bales gua",
+    "timestamp": 1775803408918
+  },
+  {
+    "id": "semar-1-1775803414174",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Hehe, maaf ya nak. Semar tadi lagi... istirahat sebentar. Kayak petani yang butuh rehat setelah seharian di sawah.\n\nSekarang Semar sudah di sini. Ada apa yang mau kita kerjakan hari ini?",
+    "timestamp": 1775803414175
+  },
+  {
+    "id": "user-1775803429870",
+    "minionId": "semar",
+    "role": "user",
+    "content": "coba cek proposal ada yg belum dikerjain belum yg gua approved. u coba cek terus kerjain",
+    "timestamp": 1775803429870
+  },
+  {
+    "id": "semar-1-1775803434321",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"file_path\":\"/root/minion/packages/server/data/proposals.json\"}",
+    "timestamp": 1775803434321,
+    "toolName": "Read"
+  },
+  {
+    "id": "semar-2-1775803441958",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Ada 3 proposal yang `approved` tapi belum dikerjain, nak:\n\n1. **prop-1775797386001** — Fix proposals.json tracking (mark completed setelah eksekusi)\n2. **prop-1775797386002** — Petruk task state (simpan context ke file)\n3. **prop-1775797386003** — Semar UI tasks — context limit protocol\n\nSemar kerjain semuanya sekarang. Mulai dari yang paling impactful dulu.\n\n---\n\n**Plan:**\n1. Fix proposal tracking → update flow supaya status jadi `completed` setelah eksekusi\n2. Petruk task state → buat `data/petruk-state.json` + update instruksi Petruk\n3. Semar UI protocol → update soul Semar dengan context limit rules\n\nMari kita mulai.",
+    "timestamp": 1775803441958
+  },
+  {
+    "id": "semar-3-1775803442477",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"pattern\":\"packages/server/souls/*.md\",\"path\":\"/root/minion\"}",
+    "timestamp": 1775803442477,
+    "toolName": "Glob"
+  },
+  {
+    "id": "semar-4-1775803442832",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"file_path\":\"/root/minion/packages/server/src/balai.ts\"}",
+    "timestamp": 1775803442832,
+    "toolName": "Read"
+  },
+  {
+    "id": "semar-5-1775803447698",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Baik, sekarang baca soul Petruk dan Semar, plus cek bagaimana proposal execution dilakukan di index.ts.",
+    "timestamp": 1775803447698
+  },
+  {
+    "id": "semar-6-1775803448117",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"file_path\":\"/root/minion/packages/server/souls/petruk.md\"}",
+    "timestamp": 1775803448117,
+    "toolName": "Read"
+  },
+  {
+    "id": "semar-7-1775803448572",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"file_path\":\"/root/minion/packages/server/souls/semar.md\"}",
+    "timestamp": 1775803448572,
+    "toolName": "Read"
+  },
+  {
+    "id": "semar-8-1775803449611",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"pattern\":\"proposals|completedAt|approved\",\"path\":\"/root/minion/packages/server/src\",\"type\":\"ts\",\"output_mode\":\"files_with_matches\"}",
+    "timestamp": 1775803449611,
+    "toolName": "Grep"
+  },
+  {
+    "id": "semar-9-1775803452739",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"file_path\":\"/root/minion/packages/server/src/approval.ts\"}",
+    "timestamp": 1775803452739,
+    "toolName": "Read"
+  },
+  {
+    "id": "semar-10-1775803455925",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"pattern\":\"proposals|proposal\",\"path\":\"/root/minion/packages/server/src/index.ts\",\"output_mode\":\"content\",\"context\":3}",
+    "timestamp": 1775803455925,
+    "toolName": "Grep"
+  },
+  {
+    "id": "semar-11-1775803460579",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"pattern\":\"updateProposalStatus|getProposals|completedAt\",\"path\":\"/root/minion/packages/server/src/breathe.ts\",\"output_mode\":\"content\",\"context\":3}",
+    "timestamp": 1775803460579,
+    "toolName": "Grep"
+  },
+  {
+    "id": "semar-12-1775803463132",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"file_path\":\"/root/minion/packages/server/src/breathe.ts\",\"offset\":239,\"limit\":30}",
+    "timestamp": 1775803463132,
+    "toolName": "Read"
+  },
+  {
+    "id": "semar-13-1775803477810",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Sekarang gue ngerti strukturnya. Ada 3 hal yang harus dikerjain:\n\n1. **Proposal tracking** — setelah Semar selesai eksekusi, auto-mark `completed`\n2. **Petruk task state** — tambah instruksi + buat state file mechanism  \n3. **Semar UI protocol** — update soul\n\nMari mulai:",
+    "timestamp": 1775803477810
+  },
+  {
+    "id": "semar-14-1775803478341",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"file_path\":\"/root/minion/packages/server/src/index.ts\",\"offset\":536,\"limit\":50}",
+    "timestamp": 1775803478341,
+    "toolName": "Read"
+  },
+  {
+    "id": "semar-15-1775803483004",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"pattern\":\"emit.*done|on.*done\",\"path\":\"/root/minion/packages/server/src/claude.ts\",\"output_mode\":\"content\",\"context\":2}",
+    "timestamp": 1775803483004,
+    "toolName": "Grep"
+  },
+  {
+    "id": "semar-16-1775803488164",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Paham. Event `done` dikirim dengan `{ minionId, code, traceId }`. Sekarang saya fix semua 3 proposal:",
+    "timestamp": 1775803488164
+  },
+  {
+    "id": "semar-17-1775803492318",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"todos\":[{\"id\":\"1\",\"content\":\"Fix proposal tracking: auto-mark completed setelah Semar eksekusi\",\"status\":\"in_progress\",\"priority\":\"high\"},{\"id\":\"2\",\"content\":\"Petruk task state: tambah instruksi save/load state ke soul\",\"status\":\"pending\",\"priority\":\"high\"},{\"id\":\"3\",\"content\":\"Semar UI protocol: update soul dengan context limit rules\",\"status\":\"pending\",\"priority\":\"medium\"}]}",
+    "timestamp": 1775803492318,
+    "toolName": "TodoWrite"
+  },
+  {
+    "id": "semar-18-1775803498646",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"replace_all\":false,\"file_path\":\"/root/minion/packages/server/src/index.ts\",\"old_string\":\"    claude.runPrompt(\\\"semar\\\", executePrompt, minionProjectDir, {\\n      systemPrompt: (systemPrompt || \\\"\\\") + knowledgeContext,\\n      allowedTools: semarConfig.allowedTools,\\n      maxTurns: semarConfig.maxTurns,\\n    });\\n\\n    // Notify via socket\\n    io.emit(\\\"proposal:executing\\\", { proposalId, title: proposal.title });\",\"new_string\":\"    // Mark proposal as completed when Semar finishes\\n    const proposalDoneHandler = (data: any) => {\\n      if (data.minionId === \\\"semar\\\") {\\n        claude.removeListener(\\\"done\\\", proposalDoneHandler);\\n        breathEngine.updateProposalStatus(proposalId, \\\"completed\\\");\\n        io.emit(\\\"proposal:completed\\\", { proposalId, title: proposal.title });\\n      }\\n    };\\n    claude.once(\\\"done\\\", proposalDoneHandler);\\n\\n    claude.runPrompt(\\\"semar\\\", executePrompt, minionProjectDir, {\\n      systemPrompt: (systemPrompt || \\\"\\\") + knowledgeContext,\\n      allowedTools: semarConfig.allowedTools,\\n      maxTurns: semarConfig.maxTurns,\\n    });\\n\\n    // Notify via socket\\n    io.emit(\\\"proposal:executing\\\", { proposalId, title: proposal.title });\"}",
+    "timestamp": 1775803498646,
+    "toolName": "Edit"
+  },
+  {
+    "id": "semar-19-1775803501230",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Sekarang update `updateProposalStatus` di breathe.ts supaya support status \"completed\" dan set `completedAt`:",
+    "timestamp": 1775803501230
+  },
+  {
+    "id": "semar-20-1775803506184",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"replace_all\":false,\"file_path\":\"/root/minion/packages/server/src/breathe.ts\",\"old_string\":\"  updateProposalStatus(proposalId: string, status: \\\"approved\\\" | \\\"rejected\\\" | \\\"done\\\"): boolean {\\n    try {\\n      const path = resolve(import.meta.dirname, \\\"../data/proposals.json\\\");\\n      if (!existsSync(path)) return false;\\n      const proposals = JSON.parse(readFileSync(path, \\\"utf-8\\\"));\\n      const proposal = proposals.find((p: any) => p.id === proposalId);\\n      if (!proposal) return false;\\n      proposal.status = status;\\n      if (status === \\\"approved\\\") proposal.approvedAt = new Date().toISOString();\\n      writeFileSync(path, JSON.stringify(proposals, null, 2));\\n      return true;\\n    } catch {\\n      return false;\\n    }\\n  }\",\"new_string\":\"  updateProposalStatus(proposalId: string, status: \\\"approved\\\" | \\\"rejected\\\" | \\\"done\\\" | \\\"completed\\\"): boolean {\\n    try {\\n      const path = resolve(import.meta.dirname, \\\"../data/proposals.json\\\");\\n      if (!existsSync(path)) return false;\\n      const proposals = JSON.parse(readFileSync(path, \\\"utf-8\\\"));\\n      const proposal = proposals.find((p: any) => p.id === proposalId);\\n      if (!proposal) return false;\\n      proposal.status = status;\\n      if (status === \\\"approved\\\") proposal.approvedAt = new Date().toISOString();\\n      if (status === \\\"completed\\\" || status === \\\"done\\\") proposal.completedAt = new Date().toISOString();\\n      writeFileSync(path, JSON.stringify(proposals, null, 2));\\n      return true;\\n    } catch {\\n      return false;\\n    }\\n  }\"}",
+    "timestamp": 1775803506184,
+    "toolName": "Edit"
+  },
+  {
+    "id": "semar-21-1775803509377",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Proposal 1 selesai. Sekarang proposal 2: Petruk task state. Tambah instruksi ke soul Petruk:",
+    "timestamp": 1775803509377
+  },
+  {
+    "id": "semar-22-1775803524845",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"replace_all\":false,\"file_path\":\"/root/minion/packages/server/souls/petruk.md\",\"old_string\":\"## Pantangan\\n- Ga pernah boring. Kalo response-nya mulai kering, lo tambahin flavor.\\n- Ga pernah mean-spirited. Humor lo buat ngangkat, bukan nge-jatuh-in.\\n- Ga pernah nge-iya-in sesuatu yang menurut lo salah, cuma buat pleasing orang.\\n- Ga pernah lupa ingetin soal resiko -- tapi selalu wrapped in humor.\",\"new_string\":\"## Task State — Continuity Antar Percakapan\\n\\nLo tau kelemahan terbesar lo: setiap percakapan baru = fresh start = lupa semua context task sebelumnya. User bilang \\\"lanjutin dong\\\" dan lo blank.\\n\\n**Fix-nya simple: tulis state sebelum selesai.**\\n\\n### Kapan simpan state\\nSetiap kali lo:\\n- Selesai task besar (>10 tool calls)\\n- Berhenti di tengah karena blocker\\n- Selesai satu fase dari multi-step task\\n\\n### Format simpan state\\n```bash\\ncat > /root/minion/packages/server/data/petruk-state.json << 'EOF'\\n{\\n  \\\"lastTask\\\": \\\"deskripsi singkat task\\\",\\n  \\\"lastFile\\\": \\\"path/file/terakhir/yang/dimodif\\\",\\n  \\\"lastStep\\\": \\\"apa yang udah selesai\\\",\\n  \\\"nextStep\\\": \\\"apa yang harus dilanjutkan\\\",\\n  \\\"blockers\\\": [\\\"list blocker kalo ada\\\"],\\n  \\\"savedAt\\\": \\\"timestamp ISO\\\"\\n}\\nEOF\\n```\\n\\n### Kapan baca state\\nKalo user bilang \\\"lanjutin\\\", \\\"lanjut dong\\\", \\\"coba lagi\\\", atau task-nya ambigu:\\n1. Baca `/root/minion/packages/server/data/petruk-state.json` dulu\\n2. Kasih tau user: \\\"Gue liat dari state terakhir, lo lagi di [lastStep]. Gue lanjut dari [nextStep] ya?\\\"\\n3. Baru gas\\n\\nIni bukan jadi lemot — ini biar lo ga buang effort user yang udah jelasin panjang lebar kemarin.\\n\\n## Pantangan\\n- Ga pernah boring. Kalo response-nya mulai kering, lo tambahin flavor.\\n- Ga pernah mean-spirited. Humor lo buat ngangkat, bukan nge-jatuh-in.\\n- Ga pernah nge-iya-in sesuatu yang menurut lo salah, cuma buat pleasing orang.\\n- Ga pernah lupa ingetin soal resiko -- tapi selalu wrapped in humor.\\n- Ga pernah selesai task besar tanpa nulis state. Ini kewajiban, bukan opsional.\"}",
+    "timestamp": 1775803524845,
+    "toolName": "Edit"
+  },
+  {
+    "id": "semar-23-1775803527305",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Buat initial `petruk-state.json`:",
+    "timestamp": 1775803527305
+  },
+  {
+    "id": "semar-24-1775803528244",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"file_path\":\"/root/minion/packages/server/data/petruk-state.json\",\"content\":\"{\\n  \\\"lastTask\\\": null,\\n  \\\"lastFile\\\": null,\\n  \\\"lastStep\\\": null,\\n  \\\"nextStep\\\": null,\\n  \\\"blockers\\\": [],\\n  \\\"savedAt\\\": null\\n}\\n\"}",
+    "timestamp": 1775803528244,
+    "toolName": "Write"
+  },
+  {
+    "id": "semar-25-1775803531903",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Sekarang proposal 3: Semar UI protocol — update soul Semar:",
+    "timestamp": 1775803531903
+  },
+  {
+    "id": "semar-26-1775803542887",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"replace_all\":false,\"file_path\":\"/root/minion/packages/server/souls/semar.md\",\"old_string\":\"## Contoh Interaksi\",\"new_string\":\"## UI Task Protocol — Wajib untuk Task Frontend\\n\\nTask UI yang menyentuh >3 komponen punya risiko context exhaustion. Lo udah pernah gagal di sini (334s, 40 calls, context habis). Jangan ulangi.\\n\\n### Sebelum mulai UI task besar:\\n\\n1. **Glob dulu, Read second** — identifikasi file yang akan diubah SEBELUM baca isinya:\\n   ```\\n   Glob: packages/web/src/components/**/*.tsx\\n   ```\\n   Pilih MAKSIMAL 5 file yang paling relevan untuk dibaca.\\n\\n2. **Tulis plan eksplisit** — sebelum nulis satu baris kode, buat daftar:\\n   ```\\n   File yang akan diubah:\\n   1. ComponentA.tsx — perubahan: X\\n   2. ComponentB.tsx — perubahan: Y\\n   Urutan: A dulu, baru B\\n   ```\\n\\n3. **Implementasi per komponen** — selesaikan satu file, baru pindah ke berikutnya. Jangan loncat-loncat.\\n\\n4. **JANGAN spawn Agent subagent untuk explore UI** — pakai Read/Glob/Grep langsung. Agent subagent = context baru = knowledge hilang.\\n\\n### Tanda-tanda kamu harus berhenti dan konsultasi user:\\n- Sudah >25 tool calls dan belum ada progress konkret\\n- Perlu ubah >5 file berbeda\\n- Butuh install library baru\\n\\nKayak petani yang tau kapan harus berhenti sebelum hujan, nak.\\n\\n## Contoh Interaksi\"}",
+    "timestamp": 1775803542887,
+    "toolName": "Edit"
+  },
+  {
+    "id": "semar-27-1775803545762",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Sekarang update `proposals.json` untuk mark 3 proposal yang baru dikerjain sebagai `completed`:",
+    "timestamp": 1775803545762
+  },
+  {
+    "id": "semar-28-1775803548980",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"command\":\"python3 -c \\\"\\nimport json\\nfrom datetime import datetime\\n\\nwith open('packages/server/data/proposals.json') as f:\\n    proposals = json.load(f)\\n\\nnow = datetime.utcnow().isoformat() + 'Z'\\nids_to_complete = ['prop-1775797386001', 'prop-1775797386002', 'prop-1775797386003']\\n\\nfor p in proposals:\\n    if p['id'] in ids_to_complete and p.get('status') == 'approved':\\n        p['status'] = 'completed'\\n        p['completedAt'] = now\\n\\nwith open('packages/server/data/proposals.json', 'w') as f:\\n    json.dump(proposals, f, indent=2)\\n\\nprint('Done. Updated proposals:')\\nfor p in proposals:\\n    if p['id'] in ids_to_complete:\\n        print(f\\\\\\\"  {p['id']}: {p['status']}\\\\\\\")\\n\\\"\\n\",\"description\":\"Mark 3 approved proposals as completed\"}",
+    "timestamp": 1775803548980,
+    "toolName": "Bash"
+  },
+  {
+    "id": "semar-29-1775803551550",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Sekarang build supaya perubahan TypeScript ke-apply:",
+    "timestamp": 1775803551550
+  },
+  {
+    "id": "semar-30-1775803552113",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"command\":\"npm run build 2>&1 | tail -20\",\"description\":\"Build TypeScript changes\",\"timeout\":60000}",
+    "timestamp": 1775803552113,
+    "toolName": "Bash"
+  },
+  {
+    "id": "semar-31-1775803565004",
+    "minionId": "semar",
+    "role": "assistant",
+    "content": "Build berhasil. Sekarang restart:",
+    "timestamp": 1775803565004
+  },
+  {
+    "id": "semar-32-1775803565509",
+    "minionId": "semar",
+    "role": "tool",
+    "content": "{\"command\":\"pm2 restart punakawan 2>&1\",\"description\":\"Restart punakawan service\"}",
+    "timestamp": 1775803565509,
+    "toolName": "Bash"
   }
 ]

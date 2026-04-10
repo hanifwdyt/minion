@@ -1420,5 +1420,33 @@
     "role": "assistant",
     "content": "Siap bro! Ada yang lain?",
     "timestamp": 1775798385741
+  },
+  {
+    "id": "user-1775802498366",
+    "minionId": "petruk",
+    "role": "user",
+    "content": "halo",
+    "timestamp": 1775802498366
+  },
+  {
+    "id": "petruk-1-1775802501362",
+    "minionId": "petruk",
+    "role": "assistant",
+    "content": "Halo! Ada yang bisa gue bantu?",
+    "timestamp": 1775802501362
+  },
+  {
+    "id": "user-1775802510249",
+    "minionId": "petruk",
+    "role": "user",
+    "content": "nah ini bisa bales, td gua chat semar gabisa dibales",
+    "timestamp": 1775802510249
+  },
+  {
+    "id": "petruk-1-1775802515650",
+    "minionId": "petruk",
+    "role": "assistant",
+    "content": "Haha iya, Semar mungkin lagi sibuk atau ada issue. Gue (Petruk) mah always available bro, siap nongkrong kapanpun! 😄\n\nAda yang mau dikerjain?",
+    "timestamp": 1775802515650
   }
 ]

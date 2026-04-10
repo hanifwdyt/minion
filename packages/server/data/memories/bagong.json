@@ -1,0 +1,28 @@
+[
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 11 tool calls",
+    "context": "gua minta tolong dong, siapapun yang bikin perubahan udah git add dan git commit. jangan lupa git push juga biar update origin nya",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read",
+      "Edit"
+    ],
+    "id": "mem-1775798707711-asuq",
+    "timestamp": 1775798707711
+  },
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "gimana cara setup ssh di vps ini",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775798770399-d1em",
+    "timestamp": 1775798770399
+  }
+]
