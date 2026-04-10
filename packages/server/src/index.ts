@@ -1022,5 +1022,5 @@ server.listen(PORT, async () => {
   logger.info({ port: PORT, minions: configStore.getMinions().length }, "Minion Server started");
   await telegramBot.start().catch((e) => logger.error(e, "Telegram bot failed"));
   await slackBot.start().catch((e) => logger.error(e, "Slack bot failed"));
-  breathEngine.start("*/10 * * * *");
+  breathEngine.start("*/10 21-23,0-5 * * *"); // every 10 min, only 9PM-6AM
 });
