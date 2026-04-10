@@ -5,6 +5,7 @@ dist/
 .env
 .env.local
 .DS_Store
+*.tsbuildinfo
 
 # Config contains runtime secrets — use config.example.json as template
 packages/server/config.json
