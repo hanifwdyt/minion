@@ -707,6 +707,16 @@ claude.on("task:done", (data) => {
   io.emit("task:done", data);
 });
 
+claude.on("interrupt", (data) => {
+  io.emit("task:interrupt", data);
+  activity.add({
+    minionId: data.minionId,
+    minionName: getMinionName(data.minionId),
+    type: "status",
+    summary: `Interrupted: ${data.message.slice(0, 60)}`,
+  });
+});
+
 claude.on("done", (data) => {
   io.emit("minion:done", data);
   fileTracker.clearMinion(data.minionId);
@@ -916,6 +926,23 @@ io.on("connection", (socket) => {
         io.emit("minion:chat", { minionId, message: denyMsg });
         return;
       }
+    }
+
+    // Check if minion is busy — INTERRUPT instead of queue
+    if (claude.getStatus(minionId) === "working") {
+      const interruptMsg = {
+        id: `interrupt-${Date.now()}`,
+        minionId,
+        role: "assistant" as const,
+        content: `_(Interrupting ${getMinionName(minionId)}...)_`,
+        timestamp: Date.now(),
+      };
+      chatStore.add(minionId, interruptMsg);
+      io.emit("minion:chat", { minionId, message: interruptMsg });
+      io.emit("task:interrupt", { minionId, message: prompt });
+
+      claude.interrupt(minionId, prompt);
+      return;
     }
 
     claude.runPrompt(minionId, prompt, resolve(config.workdir), {

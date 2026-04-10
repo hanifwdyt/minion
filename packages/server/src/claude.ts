@@ -11,6 +11,14 @@ interface ChatMessage {
   toolName?: string;
 }
 
+interface RunOptions {
+  systemPrompt?: string;
+  allowedTools?: string;
+  maxTurns?: number;
+  model?: string;
+  env?: Record<string, string>;
+}
+
 interface ClaudeSession {
   process: ChildProcess;
   minionId: string;
@@ -20,6 +28,9 @@ interface ClaudeSession {
   currentStreamText?: string;
   lastActivity: number;
   idleTimeout?: NodeJS.Timeout;
+  workdir: string;
+  options?: RunOptions;
+  originalPrompt: string;
 }
 
 export interface TaskStep {
@@ -70,13 +81,7 @@ export class ClaudeManager extends EventEmitter {
     minionId: string,
     prompt: string,
     workdir: string,
-    options?: {
-      systemPrompt?: string;
-      allowedTools?: string;
-      maxTurns?: number;
-      model?: string;
-      env?: Record<string, string>;
-    }
+    options?: RunOptions
   ) {
     const MAX_QUEUE = 10;
     const IDLE_TIMEOUT = 3 * 60 * 1000; // 3 min idle = timeout (resets on activity)
@@ -154,7 +159,10 @@ export class ClaudeManager extends EventEmitter {
       stdio: ["ignore", "pipe", "pipe"],  // stdin=ignore fixes the 3s warning
     });
 
-    const session: ClaudeSession = { process: proc, minionId, messageCounter: 0, lastActivity: Date.now() };
+    const session: ClaudeSession = {
+      process: proc, minionId, messageCounter: 0, lastActivity: Date.now(),
+      workdir, options, originalPrompt: prompt,
+    };
     this.sessions.set(minionId, session);
 
     // Start execution trace
@@ -398,6 +406,58 @@ export class ClaudeManager extends EventEmitter {
 
   getUsageStats(): UsageStats {
     return this.usage;
+  }
+
+  async interrupt(minionId: string, message: string): Promise<boolean> {
+    const session = this.sessions.get(minionId);
+    if (!session) return false;
+
+    // Capture what agent was doing
+    const progress = this.taskProgress.get(minionId);
+    const lastSteps = progress?.steps.slice(-5) || [];
+    const taskTitle = progress?.title || session.originalPrompt.slice(0, 80);
+    const savedWorkdir = session.workdir;
+    const savedOptions = session.options;
+
+    const contextSummary = lastSteps
+      .map((s: TaskStep) => `${s.status === "completed" ? "✅" : "🔄"} ${s.summary}`)
+      .join("\n");
+
+    console.log(`[claude] ${minionId} INTERRUPTED by user`);
+
+    // Stop current process — session ID auto-saved on close via proc.on("close")
+    // Use SIGTERM directly on process, don't clear queue
+    const proc = session.process;
+    if (session.idleTimeout) clearTimeout(session.idleTimeout);
+    this.sessions.delete(minionId);
+    this.taskProgress.delete(minionId);
+    proc.kill("SIGTERM");
+
+    // Wait for process cleanup
+    await new Promise((r) => setTimeout(r, 800));
+
+    // Build interrupt prompt with full context
+    const interruptPrompt = `[INTERRUPT dari user]
+
+Lo tadi lagi ngerjain: "${taskTitle}"
+Progress terakhir:
+${contextSummary || "(baru mulai)"}
+
+User bilang: ${message}
+
+Instruksi:
+1. Respond ke interrupt user ini DULU — acknowledge apa yang dia bilang
+2. Kalo user kasih info baru atau perubahan, adjust approach lo
+3. Kalo user tanya sesuatu, jawab langsung
+4. Kalo user bilang cancel/stop/ga jadi, berhenti dan konfirmasi
+5. Setelah respond ke interrupt, LANJUTKAN task "${taskTitle}" dengan context/perubahan baru dari user`;
+
+    // Emit interrupt event
+    this.emit("interrupt", { minionId, message, taskTitle });
+
+    // Resume session with interrupt prompt (runPrompt uses --resume with lastSessionId)
+    this.runPrompt(minionId, interruptPrompt, savedWorkdir, savedOptions);
+    return true;
   }
 
   stop(minionId: string) {
