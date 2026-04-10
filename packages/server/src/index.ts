@@ -32,6 +32,7 @@ import { GitLabWebhook, GitLabEvent } from "./gitlab.js";
 import { GitLabClient } from "./gitlab-client.js";
 import { GitLabPoller } from "./gitlab-poller.js";
 import { VPNManager } from "./vpn.js";
+import { BreathEngine } from "./breathe.js";
 
 // --- Core services ---
 const configStore = new ConfigStore();
@@ -47,6 +48,7 @@ const workdirManager = new WorkdirManager(resolve("."));
 const projectScanner = new ProjectScanner();
 const artifactExtractor = new ArtifactExtractor();
 const vpnManager = new VPNManager();
+const breathEngine = new BreathEngine(claude, chatStore, memoryStore, configStore);
 let debateEngine: DebateEngine;
 let approvalManager: ApprovalManager;
 let triggerEngine: TriggerEngine;
@@ -491,6 +493,23 @@ app.post("/api/vpn/disconnect", protect, async (_req, res) => {
   res.json({ ok: true });
 });
 
+// Breath system
+app.get("/api/breaths", protect, (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 20, 100);
+  res.json(breathEngine.getRecentBreaths(limit));
+});
+
+app.get("/api/breaths/:id", protect, (req, res) => {
+  const breath = breathEngine.getBreathById(String(req.params.id));
+  if (!breath) return res.status(404).json({ error: "Breath not found" });
+  res.json(breath);
+});
+
+app.post("/api/breathe", protect, async (_req, res) => {
+  const log = await breathEngine.triggerBreath();
+  res.json(log);
+});
+
 // Triggers
 app.get("/api/triggers", protect, (_req, res) => {
   res.json(triggerEngine.getTriggers());
@@ -921,4 +940,5 @@ server.listen(PORT, async () => {
   logger.info({ port: PORT, minions: configStore.getMinions().length }, "Minion Server started");
   await telegramBot.start().catch((e) => logger.error(e, "Telegram bot failed"));
   await slackBot.start().catch((e) => logger.error(e, "Slack bot failed"));
+  breathEngine.start("*/10 * * * *");
 });
