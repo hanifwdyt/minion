@@ -166,11 +166,47 @@ export class BreathEngine {
     }
   }
 
+  // --- Proposals ---
+
+  getProposals(): any[] {
+    try {
+      const path = resolve(import.meta.dirname, "../data/proposals.json");
+      if (!existsSync(path)) return [];
+      const raw = readFileSync(path, "utf-8");
+      const proposals = JSON.parse(raw);
+      return Array.isArray(proposals) ? proposals.filter((p: any) => p.status !== "done" && p.id !== "init") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  getPendingProposals(): any[] {
+    return this.getProposals().filter((p: any) => p.status === "pending");
+  }
+
+  updateProposalStatus(proposalId: string, status: "approved" | "rejected" | "done"): boolean {
+    try {
+      const path = resolve(import.meta.dirname, "../data/proposals.json");
+      if (!existsSync(path)) return false;
+      const proposals = JSON.parse(readFileSync(path, "utf-8"));
+      const proposal = proposals.find((p: any) => p.id === proposalId);
+      if (!proposal) return false;
+      proposal.status = status;
+      if (status === "approved") proposal.approvedAt = new Date().toISOString();
+      writeFileSync(path, JSON.stringify(proposals, null, 2));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private buildReflectionContext(): {
     recentChats: string;
     memories: string;
     knowledgeInventory: string;
     nextBreathQuestions: string;
+    executionTraces: string;
+    pendingProposals: string;
   } {
     // Recent chats — last 10 messages from all minions
     const minionIds = ["semar", "gareng", "petruk", "bagong", "balai"];
@@ -236,7 +272,30 @@ export class BreathEngine {
       }
     } catch {}
 
-    return { recentChats, memories, knowledgeInventory, nextBreathQuestions };
+    // Execution traces — last 10, summarized for performance analysis
+    let executionTraces = "Belum ada execution traces.";
+    try {
+      const traces = this.claude.traces.getRecent(10);
+      if (traces.length > 0) {
+        executionTraces = traces
+          .map((t) => {
+            const duration = t.completedAt ? Math.round((t.completedAt - t.startedAt) / 1000) : "?";
+            const toolCalls = t.steps.filter((s) => s.type === "tool_call").length;
+            const tools = [...new Set(t.steps.filter((s) => s.type === "tool_call").map((s) => s.toolName))].join(", ");
+            const errors = t.steps.filter((s) => s.type === "error").length;
+            return `- [${t.minionId}] ${t.status} | ${duration}s | ${toolCalls} tool calls (${tools}) | ${errors} errors | tokens: ${t.tokenUsage.input}in/${t.tokenUsage.output}out | prompt: "${t.prompt.slice(0, 80)}"`;
+          })
+          .join("\n");
+      }
+    } catch {}
+
+    // Pending proposals
+    const proposals = this.getPendingProposals();
+    const pendingProposals = proposals.length > 0
+      ? proposals.map((p: any) => `- [${p.priority}] ${p.title}: ${(p.description || "").slice(0, 100)}`).join("\n")
+      : "Belum ada proposals pending.";
+
+    return { recentChats, memories, knowledgeInventory, nextBreathQuestions, executionTraces, pendingProposals };
   }
 
   private buildBreathPrompt(context: {
@@ -244,6 +303,8 @@ export class BreathEngine {
     memories: string;
     knowledgeInventory: string;
     nextBreathQuestions: string;
+    executionTraces: string;
+    pendingProposals: string;
   }): string {
     // Load breath.md template
     let template: string;
@@ -256,8 +317,10 @@ export class BreathEngine {
     // Replace placeholders
     return template
       .replace("{{recent_chats}}", context.recentChats || "(kosong)")
+      .replace("{{execution_traces}}", context.executionTraces || "(kosong)")
       .replace("{{memories}}", context.memories || "(kosong)")
       .replace("{{knowledge_inventory}}", context.knowledgeInventory || "(kosong)")
+      .replace("{{pending_proposals}}", context.pendingProposals || "(kosong)")
       .replace("{{next_breath_questions}}", context.nextBreathQuestions || "(kosong)");
   }
 

@@ -510,6 +510,33 @@ app.post("/api/breathe", protect, async (_req, res) => {
   res.json(log);
 });
 
+// Improvement Proposals
+app.get("/api/proposals", protect, (_req, res) => {
+  res.json(breathEngine.getProposals());
+});
+
+app.get("/api/proposals/pending", protect, (_req, res) => {
+  res.json(breathEngine.getPendingProposals());
+});
+
+app.post("/api/proposals/:id/approve", protect, (req, res) => {
+  const ok = breathEngine.updateProposalStatus(String(req.params.id), "approved");
+  if (!ok) return res.status(404).json({ error: "Proposal not found" });
+  res.json({ ok: true, status: "approved" });
+});
+
+app.post("/api/proposals/:id/reject", protect, (req, res) => {
+  const ok = breathEngine.updateProposalStatus(String(req.params.id), "rejected");
+  if (!ok) return res.status(404).json({ error: "Proposal not found" });
+  res.json({ ok: true, status: "rejected" });
+});
+
+app.post("/api/proposals/:id/done", protect, (req, res) => {
+  const ok = breathEngine.updateProposalStatus(String(req.params.id), "done");
+  if (!ok) return res.status(404).json({ error: "Proposal not found" });
+  res.json({ ok: true, status: "done" });
+});
+
 // Task progress
 app.get("/api/tasks/active", protect, (_req, res) => {
   res.json(claude.getAllTaskProgress());
