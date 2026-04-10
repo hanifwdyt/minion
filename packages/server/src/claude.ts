@@ -18,6 +18,25 @@ interface ClaudeSession {
   messageCounter: number;
   currentStreamId?: string;
   currentStreamText?: string;
+  lastActivity: number;
+  idleTimeout?: NodeJS.Timeout;
+}
+
+export interface TaskStep {
+  id: string;
+  minionId: string;
+  summary: string;
+  status: "pending" | "in_progress" | "completed" | "failed";
+  toolName?: string;
+  detail?: string;
+  timestamp: number;
+}
+
+export interface TaskProgress {
+  minionId: string;
+  title: string;
+  steps: TaskStep[];
+  startedAt: number;
 }
 
 interface QueuedTask {
@@ -44,6 +63,7 @@ export class ClaudeManager extends EventEmitter {
   private lastSessionIds: Map<string, string> = new Map();
   private queues: Map<string, QueuedTask[]> = new Map();
   private usage: UsageStats = { totalInputTokens: 0, totalOutputTokens: 0, byMinion: {} };
+  private taskProgress: Map<string, TaskProgress> = new Map(); // minionId → current task progress
   public traces = new TraceStore();
 
   async runPrompt(
@@ -59,7 +79,7 @@ export class ClaudeManager extends EventEmitter {
     }
   ) {
     const MAX_QUEUE = 10;
-    const PROCESS_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+    const IDLE_TIMEOUT = 3 * 60 * 1000; // 3 min idle = timeout (resets on activity)
 
     // If minion is already working, queue the task
     if (this.sessions.has(minionId)) {
@@ -134,32 +154,49 @@ export class ClaudeManager extends EventEmitter {
       stdio: ["ignore", "pipe", "pipe"],  // stdin=ignore fixes the 3s warning
     });
 
-    const session: ClaudeSession = { process: proc, minionId, messageCounter: 0 };
+    const session: ClaudeSession = { process: proc, minionId, messageCounter: 0, lastActivity: Date.now() };
     this.sessions.set(minionId, session);
 
     // Start execution trace
     this.traces.startTrace(minionId, prompt);
 
+    // Init task progress — extract title from first line of prompt
+    const taskTitle = prompt.split("\n")[0].slice(0, 100);
+    this.taskProgress.set(minionId, {
+      minionId,
+      title: taskTitle,
+      steps: [],
+      startedAt: Date.now(),
+    });
+    this.emit("task:start", { minionId, title: taskTitle });
     this.emit("status", { minionId, status: "working" });
 
-    // Process timeout
-    const timeout = setTimeout(() => {
-      if (this.sessions.has(minionId)) {
-        console.log(`[claude] ${minionId} timeout after 10 minutes`);
-        this.traces.addStep(minionId, { type: "error", content: "Process timeout (10 minutes)" });
-        this.traces.completeTrace(minionId, "timeout");
-        this.emitChat(minionId, session, {
-          role: "assistant",
-          content: "Process timeout (10 minutes). Stopping.",
-        });
-        this.stop(minionId);
-      }
-    }, PROCESS_TIMEOUT);
+    // Idle timeout — resets on every activity
+    const resetIdleTimeout = () => {
+      session.lastActivity = Date.now();
+      if (session.idleTimeout) clearTimeout(session.idleTimeout);
+      session.idleTimeout = setTimeout(() => {
+        if (this.sessions.has(minionId)) {
+          const idleSec = Math.round((Date.now() - session.lastActivity) / 1000);
+          console.log(`[claude] ${minionId} idle timeout (${idleSec}s no activity)`);
+          this.traces.addStep(minionId, { type: "error", content: `Idle timeout (${idleSec}s no activity)` });
+          this.traces.completeTrace(minionId, "timeout");
+          this.emitChat(minionId, session, {
+            role: "assistant",
+            content: `Idle timeout — no activity for ${Math.round(IDLE_TIMEOUT / 60000)} minutes. Stopping.`,
+          });
+          this.stop(minionId);
+        }
+      }, IDLE_TIMEOUT);
+    };
+    resetIdleTimeout();
 
     let buffer = "";
     let currentAssistantText = "";
 
     proc.stdout?.on("data", (chunk: Buffer) => {
+      resetIdleTimeout(); // Activity detected — reset idle timer
+
       buffer += chunk.toString();
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
@@ -184,7 +221,7 @@ export class ClaudeManager extends EventEmitter {
     });
 
     proc.on("close", (code) => {
-      clearTimeout(timeout);
+      if (session.idleTimeout) clearTimeout(session.idleTimeout);
       // Flush any remaining assistant text
       if (currentAssistantText.trim()) {
         this.emitChat(minionId, session, {
@@ -203,6 +240,16 @@ export class ClaudeManager extends EventEmitter {
       console.log(`[claude] ${minionId} exited with code ${code}`);
       const trace = this.traces.completeTrace(minionId, code === 0 ? "completed" : "failed");
       this.sessions.delete(minionId);
+
+      // Finalize task progress
+      const progress = this.taskProgress.get(minionId);
+      if (progress) {
+        const lastStep = progress.steps.filter((s: TaskStep) => s.status === "in_progress").pop();
+        if (lastStep) lastStep.status = code === 0 ? "completed" : "failed";
+        this.emit("task:done", { minionId, progress, code });
+        this.taskProgress.delete(minionId);
+      }
+
       this.emit("done", { minionId, code, traceId: trace?.id });
 
       // Process next queued task or go idle
@@ -284,6 +331,9 @@ export class ClaudeManager extends EventEmitter {
                 toolName: block.name,
                 toolInput: block.input,
               });
+
+              // Track as task step
+              this.addTaskStep(minionId, block.name, block.input);
 
               // Loop detection
               const repeatCount = this.traces.checkToolLoop(minionId, block.name, JSON.stringify(block.input).slice(0, 100));
@@ -387,5 +437,79 @@ export class ClaudeManager extends EventEmitter {
 
   getStatus(minionId: string): "idle" | "working" {
     return this.sessions.has(minionId) ? "working" : "idle";
+  }
+
+  // --- Task Progress Tracking ---
+
+  private addTaskStep(minionId: string, toolName: string, toolInput: any) {
+    const progress = this.taskProgress.get(minionId);
+    if (!progress) return;
+
+    // Mark previous in_progress step as completed
+    const prev = progress.steps.filter((s: TaskStep) => s.status === "in_progress").pop();
+    if (prev) prev.status = "completed";
+
+    // Generate human-readable summary from tool call
+    const summary = this.summarizeToolCall(toolName, toolInput);
+    const step: TaskStep = {
+      id: `step-${Date.now()}-${progress.steps.length}`,
+      minionId,
+      summary,
+      status: "in_progress",
+      toolName,
+      detail: JSON.stringify(toolInput).slice(0, 200),
+      timestamp: Date.now(),
+    };
+
+    progress.steps.push(step);
+
+    // Emit for real-time UI
+    this.emit("task:step", { minionId, step, progress });
+  }
+
+  private summarizeToolCall(toolName: string, input: any): string {
+    try {
+      switch (toolName) {
+        case "Read":
+          return `Reading ${input.file_path?.split("/").pop() || "file"}`;
+        case "Edit":
+          return `Editing ${input.file_path?.split("/").pop() || "file"}`;
+        case "Write":
+          return `Writing ${input.file_path?.split("/").pop() || "file"}`;
+        case "Bash":
+          const cmd = (input.command || "").slice(0, 60);
+          return `Running: ${cmd}${(input.command || "").length > 60 ? "..." : ""}`;
+        case "Glob":
+          return `Searching files: ${input.pattern || ""}`;
+        case "Grep":
+          return `Searching for: ${(input.pattern || "").slice(0, 40)}`;
+        case "WebSearch":
+          return `Searching web: ${(input.query || "").slice(0, 40)}`;
+        case "WebFetch":
+          return `Fetching URL`;
+        case "LSP":
+          return `Code analysis (LSP)`;
+        default:
+          return `${toolName}`;
+      }
+    } catch {
+      return toolName;
+    }
+  }
+
+  getTaskProgress(minionId: string): TaskProgress | null {
+    return this.taskProgress.get(minionId) || null;
+  }
+
+  getAllTaskProgress(): TaskProgress[] {
+    return Array.from(this.taskProgress.values());
+  }
+
+  getQueuedTasks(minionId: string): QueuedTask[] {
+    return this.queues.get(minionId) || [];
+  }
+
+  getAllQueues(): { minionId: string; queue: QueuedTask[] }[] {
+    return Array.from(this.queues.entries()).map(([minionId, queue]) => ({ minionId, queue }));
   }
 }

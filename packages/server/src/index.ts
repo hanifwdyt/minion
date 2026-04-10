@@ -510,6 +510,21 @@ app.post("/api/breathe", protect, async (_req, res) => {
   res.json(log);
 });
 
+// Task progress
+app.get("/api/tasks/active", protect, (_req, res) => {
+  res.json(claude.getAllTaskProgress());
+});
+
+app.get("/api/tasks/active/:minionId", protect, (req, res) => {
+  const progress = claude.getTaskProgress(String(req.params.minionId));
+  if (!progress) return res.status(404).json({ error: "No active task" });
+  res.json(progress);
+});
+
+app.get("/api/tasks/queues", protect, (_req, res) => {
+  res.json(claude.getAllQueues());
+});
+
 // Triggers
 app.get("/api/triggers", protect, (_req, res) => {
   res.json(triggerEngine.getTriggers());
@@ -677,6 +692,19 @@ claude.on("status", (data) => {
     type: "status",
     summary: data.status === "working" ? "Started working" : "Finished",
   });
+});
+
+// Task progress events → real-time UI
+claude.on("task:start", (data) => {
+  io.emit("task:start", data);
+});
+
+claude.on("task:step", (data) => {
+  io.emit("task:step", data);
+});
+
+claude.on("task:done", (data) => {
+  io.emit("task:done", data);
 });
 
 claude.on("done", (data) => {
