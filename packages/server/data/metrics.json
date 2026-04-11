@@ -1,88 +1,98 @@
 {
   "byMinion": {
     "semar": {
-      "totalTasks": 48,
-      "completedTasks": 20,
-      "failedTasks": 28,
-      "totalTokensInput": 215,
-      "totalTokensOutput": 79283,
-      "totalCost": 1.1898900000000001,
-      "totalDurationMs": 2374778,
+      "totalTasks": 183,
+      "completedTasks": 147,
+      "failedTasks": 36,
+      "totalTokensInput": 10893,
+      "totalTokensOutput": 377085,
+      "totalCost": 5.688953999999999,
+      "totalDurationMs": 11309923,
       "toolCallCounts": {
-        "Agent": 4,
-        "Bash": 134,
-        "Read": 142,
-        "Grep": 14,
-        "ToolSearch": 2,
-        "TodoWrite": 4,
-        "Edit": 30,
-        "Glob": 9,
-        "Write": 13
+        "Agent": 20,
+        "Bash": 680,
+        "Read": 521,
+        "Grep": 54,
+        "ToolSearch": 11,
+        "TodoWrite": 54,
+        "Edit": 108,
+        "Glob": 29,
+        "Write": 65,
+        "WebSearch": 12,
+        "Skill": 2,
+        "CronCreate": 1
       },
-      "loopDetections": 3
+      "loopDetections": 48,
+      "conversations": 54
     },
     "gareng": {
-      "totalTasks": 12,
-      "completedTasks": 11,
+      "totalTasks": 17,
+      "completedTasks": 16,
       "failedTasks": 1,
-      "totalTokensInput": 99,
-      "totalTokensOutput": 37552,
-      "totalCost": 0.563577,
-      "totalDurationMs": 1618310,
+      "totalTokensInput": 123,
+      "totalTokensOutput": 47753,
+      "totalCost": 0.716664,
+      "totalDurationMs": 1835648,
       "toolCallCounts": {
-        "Bash": 166,
-        "Read": 8,
+        "Bash": 171,
+        "Read": 11,
         "Agent": 3,
         "ToolSearch": 1,
         "WebSearch": 3,
         "WebFetch": 3,
-        "Edit": 3
+        "Edit": 6
       },
-      "loopDetections": 8
+      "loopDetections": 8,
+      "conversations": 3
     },
     "petruk": {
-      "totalTasks": 9,
-      "completedTasks": 7,
+      "totalTasks": 16,
+      "completedTasks": 14,
       "failedTasks": 2,
-      "totalTokensInput": 47,
-      "totalTokensOutput": 11670,
-      "totalCost": 0.17519099999999996,
-      "totalDurationMs": 962987,
+      "totalTokensInput": 92,
+      "totalTokensOutput": 33695,
+      "totalCost": 0.505701,
+      "totalDurationMs": 1492196,
       "toolCallCounts": {
-        "Bash": 36,
+        "Bash": 62,
         "TodoWrite": 5,
         "Agent": 1,
         "Glob": 4,
         "Grep": 6,
-        "Read": 17,
-        "ToolSearch": 1,
-        "Edit": 4
+        "Read": 20,
+        "ToolSearch": 2,
+        "Edit": 6,
+        "WebSearch": 1
       },
-      "loopDetections": 3
+      "loopDetections": 3,
+      "conversations": 1
     },
     "bagong": {
-      "totalTasks": 7,
-      "completedTasks": 4,
+      "totalTasks": 8,
+      "completedTasks": 5,
       "failedTasks": 3,
-      "totalTokensInput": 34,
-      "totalTokensOutput": 4870,
-      "totalCost": 0.073152,
-      "totalDurationMs": 724059,
+      "totalTokensInput": 1114,
+      "totalTokensOutput": 12780,
+      "totalCost": 0.195042,
+      "totalDurationMs": 871025,
       "toolCallCounts": {
-        "Bash": 31,
-        "Read": 9,
+        "Bash": 32,
+        "Read": 11,
         "Glob": 1,
-        "Edit": 1,
+        "Edit": 3,
         "Grep": 3,
-        "ToolSearch": 1,
-        "CronCreate": 1
+        "ToolSearch": 2,
+        "CronCreate": 1,
+        "WebFetch": 1,
+        "WebSearch": 5
       },
-      "loopDetections": 0
+      "loopDetections": 1,
+      "conversations": 5
     }
   },
   "delegations": {
     "total": 0,
     "byMinion": {}
   },
-  "lastUpdated": 1775807844557
+  "lastUpdated": 1775882478154
 }

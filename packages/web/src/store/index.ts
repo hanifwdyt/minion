@@ -80,6 +80,13 @@ interface ActivityEvent {
 }
 
 interface AppStore {
+  // Auth
+  token: string | null;
+  user: string | null;
+  isAuthenticated: boolean;
+  setAuth: (token: string, user: string) => void;
+  logout: () => void;
+
   minions: MinionState[];
   selectedMinionId: string | null;
   panelOpen: boolean;
@@ -111,6 +118,13 @@ interface AppStore {
 export const useStore = create<AppStore>()(
   persist(
     (set) => ({
+      // Auth
+      token: null,
+      user: null,
+      isAuthenticated: false,
+      setAuth: (token, user) => set({ token, user, isAuthenticated: true }),
+      logout: () => set({ token: null, user: null, isAuthenticated: false }),
+
       minions: DEFAULT_MINIONS,
       selectedMinionId: null,
       panelOpen: false,
@@ -191,6 +205,9 @@ export const useStore = create<AppStore>()(
       name: "minion-chat-storage",
       partialize: (state) => ({
         chatMessages: state.chatMessages,
+        token: state.token,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
       }),
     }
   )

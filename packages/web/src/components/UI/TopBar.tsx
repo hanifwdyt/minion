@@ -3,7 +3,7 @@ import { useStore } from "../../store";
 import { MuteButton } from "./AudioManager";
 import { colors, fonts, fontSize, shadows, transition, glass, radius } from "../../styles/tokens";
 import {
-  IconPunakawan, IconSun, IconMoon,
+  IconPunakawan,
   IconCrosshair, IconCamera, IconSettings,
   IconActivity, IconBalai,
 } from "./Icons";
@@ -14,28 +14,6 @@ export function TopBar() {
   const { minions, connected, selectedMinionId, selectMinion, activityOpen, setActivityOpen, setDashboardOpen, cameraMode, setCameraMode } = useStore();
   const workingCount = minions.filter((m) => m.status === "working").length;
   const isBalaiSelected = selectedMinionId === "balai";
-  const [breathEnabled, setBreathEnabled] = useState(false);
-  const [breathLoading, setBreathLoading] = useState(false);
-
-  useEffect(() => {
-    fetch(`${API}/breath/status`)
-      .then((r) => r.json())
-      .then((data) => setBreathEnabled(data.manualEnabled ?? false))
-      .catch(() => {});
-  }, []);
-
-  async function toggleBreath() {
-    setBreathLoading(true);
-    try {
-      const endpoint = breathEnabled ? "disable" : "enable";
-      const res = await fetch(`${API}/breath/${endpoint}`, { method: "POST" });
-      const data = await res.json();
-      setBreathEnabled(data.manualEnabled ?? !breathEnabled);
-    } catch {} finally {
-      setBreathLoading(false);
-    }
-  }
-
   return (
     <header
       role="banner"
@@ -91,15 +69,6 @@ export function TopBar() {
         style={{ display: "flex", alignItems: "center", gap: 6 }}
       >
         <MuteButton />
-
-        <IconBtn
-          onClick={toggleBreath}
-          disabled={breathLoading}
-          active={breathEnabled}
-          label={breathEnabled ? "Breath ON" : "Breath OFF"}
-        >
-          {breathEnabled ? <IconSun size={14} /> : <IconMoon size={14} />}
-        </IconBtn>
 
         <IconBtn
           onClick={() => setCameraMode(cameraMode === "overview" ? "follow" : "overview")}

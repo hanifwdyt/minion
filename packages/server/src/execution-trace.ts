@@ -6,6 +6,22 @@ import { createHash } from "crypto";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TRACES_DIR = resolve(__dirname, "../data/traces");
 
+// Tool-specific loop thresholds — consecutive identical calls before flagging
+// Higher = more tolerant (tools that legitimately retry get more leeway)
+const LOOP_THRESHOLDS: Record<string, number> = {
+  Bash: 7,   // Commands may legitimately retry with same input
+  Read: 4,
+  Grep: 4,
+  Glob: 4,
+  Write: 3,  // Writing same content twice is almost always a bug
+  Edit: 3,
+  default: 5,
+};
+
+export function getLoopThreshold(toolName: string): number {
+  return LOOP_THRESHOLDS[toolName] ?? LOOP_THRESHOLDS.default;
+}
+
 export interface ExecutionStep {
   type: "reasoning" | "tool_call" | "tool_result" | "error" | "system";
   timestamp: number;
@@ -29,10 +45,16 @@ export interface ExecutionTrace {
   loopDetections: number;
 }
 
+// Tracks the current streak of identical consecutive tool calls per minion
+interface ConsecutiveState {
+  fingerprint: string;
+  count: number;
+}
+
 export class TraceStore {
   private activeTraces: Map<string, ExecutionTrace> = new Map();
-  // Tool call fingerprints for loop detection: minionId → fingerprint[]
-  private toolFingerprints: Map<string, string[]> = new Map();
+  // Consecutive identical tool call state: minionId → { fingerprint, count }
+  private consecutiveState: Map<string, ConsecutiveState> = new Map();
 
   constructor() {
     if (!existsSync(TRACES_DIR)) {
@@ -40,12 +62,11 @@ export class TraceStore {
     }
   }
 
-  // Start a new execution trace
   startTrace(minionId: string, prompt: string): ExecutionTrace {
     const trace: ExecutionTrace = {
       id: `trace-${minionId}-${Date.now()}`,
       minionId,
-      prompt: prompt.slice(0, 500), // Cap stored prompt length
+      prompt: prompt.slice(0, 500),
       startedAt: Date.now(),
       status: "running",
       steps: [],
@@ -54,41 +75,47 @@ export class TraceStore {
       loopDetections: 0,
     };
     this.activeTraces.set(minionId, trace);
-    this.toolFingerprints.set(minionId, []);
+    this.consecutiveState.set(minionId, { fingerprint: "", count: 0 });
     return trace;
   }
 
-  // Add a step to active trace
   addStep(minionId: string, step: Omit<ExecutionStep, "timestamp">): void {
     const trace = this.activeTraces.get(minionId);
     if (!trace) return;
     trace.steps.push({ ...step, timestamp: Date.now() });
   }
 
-  // Check for tool call loops — returns repeat count
-  checkToolLoop(minionId: string, toolName: string, errorContent?: string): number {
+  // Check for tool call loops — returns consecutive repeat count.
+  // Uses full input hash (not truncated) for accurate detection.
+  // Resets streak when a different tool/input is called (no false positives
+  // from tools that happen to repeat non-consecutively).
+  checkToolLoop(minionId: string, toolName: string, inputContent: string): number {
     const fingerprint = createHash("md5")
-      .update(`${toolName}:${errorContent || ""}`)
+      .update(`${toolName}:${inputContent}`)
       .digest("hex")
-      .slice(0, 12);
+      .slice(0, 16);
 
-    const prints = this.toolFingerprints.get(minionId) || [];
-    prints.push(fingerprint);
-    this.toolFingerprints.set(minionId, prints);
+    const state = this.consecutiveState.get(minionId) || { fingerprint: "", count: 0 };
 
-    // Count recent occurrences (last 10 calls)
-    const recent = prints.slice(-10);
-    const count = recent.filter((p) => p === fingerprint).length;
+    if (state.fingerprint === fingerprint) {
+      state.count++;
+    } else {
+      // Different call — reset streak
+      state.count = 1;
+      state.fingerprint = fingerprint;
+    }
+    this.consecutiveState.set(minionId, state);
 
-    if (count >= 3) {
+    // Track detection metric when approaching threshold
+    const threshold = getLoopThreshold(toolName);
+    if (state.count >= Math.max(Math.floor(threshold * 0.6), 2)) {
       const trace = this.activeTraces.get(minionId);
       if (trace) trace.loopDetections++;
     }
 
-    return count;
+    return state.count;
   }
 
-  // Update token usage
   updateUsage(minionId: string, input: number, output: number): void {
     const trace = this.activeTraces.get(minionId);
     if (!trace) return;
@@ -98,7 +125,6 @@ export class TraceStore {
     trace.cost = (trace.tokenUsage.input * 3 + trace.tokenUsage.output * 15) / 1_000_000;
   }
 
-  // Complete trace
   completeTrace(minionId: string, status: "completed" | "failed" | "timeout"): ExecutionTrace | undefined {
     const trace = this.activeTraces.get(minionId);
     if (!trace) return undefined;
@@ -106,22 +132,18 @@ export class TraceStore {
     trace.completedAt = Date.now();
     trace.status = status;
 
-    // Persist to disk
     this.save(trace);
 
-    // Cleanup
     this.activeTraces.delete(minionId);
-    this.toolFingerprints.delete(minionId);
+    this.consecutiveState.delete(minionId);
 
     return trace;
   }
 
-  // Get active trace for a minion
   getActive(minionId: string): ExecutionTrace | undefined {
     return this.activeTraces.get(minionId);
   }
 
-  // Get recent traces (from disk)
   getRecent(limit = 20): ExecutionTrace[] {
     const files = readdirSync(TRACES_DIR)
       .filter((f) => f.endsWith(".json"))
@@ -138,13 +160,10 @@ export class TraceStore {
     }).filter(Boolean) as ExecutionTrace[];
   }
 
-  // Get specific trace
   getById(id: string): ExecutionTrace | null {
-    // Check active first
     for (const trace of this.activeTraces.values()) {
       if (trace.id === id) return trace;
     }
-    // Check disk
     const filePath = resolve(TRACES_DIR, `${id}.json`);
     if (existsSync(filePath)) {
       try {

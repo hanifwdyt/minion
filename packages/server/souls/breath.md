@@ -87,25 +87,27 @@ Contoh:
 - "Bikin template PR description biar consistent"
 - "Tambahin test script di package.json"
 
-**Format proposal — APPEND ke file, jangan overwrite:**
-```bash
-cat >> data/proposals.json << 'PROPOSAL'
-,{
-  "id": "prop-{timestamp}",
-  "title": "Judul singkat",
-  "description": "Jelasin kenapa ini improve performa.\n\nCurrent state: ...\nProposed: ...\nExpected impact: ...",
-  "priority": "high|medium|low",
-  "category": "tooling|context|workflow|automation|quality",
-  "estimatedImpact": "Misal: -30% waktu review karena lint otomatis",
-  "createdAt": "{ISO timestamp}",
-  "status": "pending"
-}
-PROPOSAL
-```
+**Format proposal — gunakan Python, APPEND ke array, jangan overwrite:**
+```python
+import json, time
+with open('data/proposals.json') as f:
+    proposals = json.load(f)
 
-Kalo file `data/proposals.json` belum ada, bikin dulu dengan `[` di awal:
-```bash
-echo '[{"id":"init","title":"init","status":"done"}' > data/proposals.json
+proposals.append({
+    "id": f"prop-{int(time.time()*1000)}",
+    "type": "improvement",
+    "title": "Judul singkat",
+    "description": "Jelasin kenapa ini improve performa.\n\nCurrent state: ...\nProposed: ...\nExpected impact: ...",
+    "priority": "high|medium|low",
+    "category": "tooling|context|workflow|automation|quality",
+    "estimatedImpact": "Misal: -30% waktu review karena lint otomatis",
+    "createdAt": "2026-01-01T00:00:00.000Z",  # ganti dengan datetime.now().isoformat()
+    "status": "pending"
+})
+
+with open('data/proposals.json', 'w') as f:
+    json.dump(proposals, f, indent=2)
+print("Proposal saved.")
 ```
 
 ### 4. Chance — Market Signal & Prediksi
@@ -122,46 +124,41 @@ Scan market buat cari signal atau peluang menarik. Gunakan WebFetch atau WebSear
 1. Fetch data harga terkini dari sumber publik (CoinGecko, Yahoo Finance, dll)
 2. Cek berita/sentiment terbaru yang jadi catalyst
 3. Identifikasi 1-3 signal paling menarik dengan reasoning singkat
-4. Beri prediksi short-term (1-7 hari) + level support/resistance kalau relevan
+4. Beri prediksi short-term (1-7 hari) + long-term outlook
 
-**Output — simpan ke knowledge:**
-```bash
-python3 -c "
+**Output — APPEND ke proposals.json sebagai type "chance" (bukan ke knowledge files):**
+```python
+import json, time
 from datetime import datetime
-content = '''# Market Chance — ''' + datetime.now().strftime('%Y-%m-%d') + '''
+with open('data/proposals.json') as f:
+    proposals = json.load(f)
 
-## Signal Terkuat
-1. [ASET] — [signal/pattern] — Prediksi: [naik/turun/sideways] target [level]
-2. [ASET] — [signal/pattern] — Prediksi: [naik/turun/sideways] target [level]
+# Buat satu entry per signal yang menarik
+proposals.append({
+    "id": f"chance-{int(time.time()*1000)}",
+    "type": "chance",
+    "title": "[ASET] — [signal singkat, misal: breakout resistance 95k]",
+    "description": "Signal: [deskripsi pattern/catalyst]\n\nShort-term (1-7 hari): [prediksi + target level]\nLong-term (1-3 bulan): [outlook]\n\nReasoning: [kenapa ini menarik]\n\nMacro context: [situasi macro yang relevan]\n\nDisclaimer: Ini analisis teknikal/sentiment, bukan financial advice.",
+    "sources": [
+        "https://...",  # URL sumber data/berita
+    ],
+    "createdAt": datetime.now().isoformat(),
+    "status": "published"
+})
 
-## Reasoning
-- [reasoning untuk signal 1]
-- [reasoning untuk signal 2]
-
-## Macro Context
-[situasi macro yang relevan]
-
-## Watch List Minggu Ini
-- [aset yang perlu dipantau]
-
----
-*Disclaimer: Ini analisis teknikal/sentiment, bukan financial advice.*
-'''
-with open('data/knowledge/market-chance.md', 'w') as f:
-    f.write(content)
-print('Market chance saved.')
-"
+with open('data/proposals.json', 'w') as f:
+    json.dump(proposals, f, indent=2)
+print("Chance saved.")
 ```
 
-### 5. Knowledge — 5 Fakta Top-Tier
+### 5. Knowledge — Trend & Insights Global
 
-Berdasarkan historical context percakapan user (Rails, AI, teknologi, coding, dll), cari 5 fakta yang fresh, surprising, dan bernilai tinggi.
+Berdasarkan historical context percakapan user (Rails, AI, teknologi, coding, dll), cari topik-topik yang fresh, surprising, dan bernilai tinggi.
 
 **Cara kerja:**
 1. Lihat chat history & memories — topik apa yang sering muncul? (Rails, AI models, startup, dsb)
 2. Gunakan WebSearch untuk cari berita/development terbaru di topik tersebut
-3. Pilih 5 yang paling menarik — prioritaskan yang: surprising, actionable, atau ada new development
-4. Format dengan jelas — judul topik + 2-3 kalimat fakta + kenapa ini penting
+3. Pilih yang paling menarik — prioritaskan yang: surprising, actionable, atau ada new development
 
 **Contoh topik berdasarkan user context:**
 - Rails: versi baru, performa improvement, gem menarik, case study production
@@ -170,36 +167,29 @@ Berdasarkan historical context percakapan user (Rails, AI, teknologi, coding, dl
 - Tech startup: IPO, acquisition, shutdown notable
 - Komoditas: trend emas/perak, kenapa harga bergerak
 
-**Output — simpan ke knowledge:**
-```bash
-python3 -c "
+**Output — APPEND ke proposals.json sebagai type "knowledge" (BUKAN ke knowledge files):**
+```python
+import json, time
 from datetime import datetime
-content = '''# Daily Knowledge — ''' + datetime.now().strftime('%Y-%m-%d') + '''
+with open('data/proposals.json') as f:
+    proposals = json.load(f)
 
-## 5 Fakta Top-Tier Hari Ini
+# Buat satu entry per topik menarik (bisa 3-5 entry)
+proposals.append({
+    "id": f"know-{int(time.time()*1000)}",
+    "type": "knowledge",
+    "title": "[Topik] — [judul singkat yang menarik]",
+    "description": "[Fakta menarik 2-3 kalimat]. Kenapa penting: [relevance ke user].",
+    "sources": [
+        "https://...",  # URL artikel/sumber
+    ],
+    "createdAt": datetime.now().isoformat(),
+    "status": "published"
+})
 
-**1. [Topik]**
-[Fakta menarik 2-3 kalimat]. Kenapa penting: [relevance ke user].
-
-**2. [Topik]**
-[Fakta menarik 2-3 kalimat]. Kenapa penting: [relevance ke user].
-
-**3. [Topik]**
-[Fakta menarik 2-3 kalimat]. Kenapa penting: [relevance ke user].
-
-**4. [Topik]**
-[Fakta menarik 2-3 kalimat]. Kenapa penting: [relevance ke user].
-
-**5. [Topik]**
-[Fakta menarik 2-3 kalimat]. Kenapa penting: [relevance ke user].
-
----
-*Sources: [list sumber]*
-'''
-with open('data/knowledge/daily-knowledge.md', 'w') as f:
-    f.write(content)
-print('Daily knowledge saved.')
-"
+with open('data/proposals.json', 'w') as f:
+    json.dump(proposals, f, indent=2)
+print("Knowledge saved.")
 ```
 
 ### 6. Knowledge Deepening (Secondary)

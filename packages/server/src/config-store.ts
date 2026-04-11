@@ -27,7 +27,7 @@ export interface MinionConfig {
 export interface AppConfig {
   minions: MinionConfig[];
   integrations: {
-    telegram: { enabled: boolean; token: string };
+    telegram: { enabled: boolean; token: string; allowedUserId?: number };
     slack: { enabled: boolean; botToken: string; signingSecret: string; appToken: string };
     webhook: { enabled: boolean; secret: string };
     github: { enabled: boolean; webhookSecret: string; defaultReviewer: string; repos: string[] };

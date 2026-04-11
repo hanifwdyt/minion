@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { randomBytes } from "crypto";
 import { ConfigStore } from "./config-store.js";
 import { logger } from "./logger.js";
 
@@ -10,7 +11,50 @@ export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
+function isDefaultCredentials(authConfig: { adminUser: string; adminPass: string }): boolean {
+  return authConfig.adminUser === "admin" && authConfig.adminPass === "admin";
+}
+
 export function setupAuth(app: any, configStore: ConfigStore) {
+  // Status — apakah sudah ada akun terdaftar
+  app.get("/api/auth/status", (_req: Request, res: Response) => {
+    const authConfig = configStore.getAuth();
+    const hasAccount = authConfig.enabled && !isDefaultCredentials(authConfig);
+    res.json({ hasAccount, authEnabled: authConfig.enabled });
+  });
+
+  // Register — hanya boleh kalau belum ada akun (auth disabled atau masih default)
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
+    const authConfig = configStore.getAuth();
+    if (authConfig.enabled && !isDefaultCredentials(authConfig)) {
+      return res.status(403).json({ error: "Account already exists" });
+    }
+
+    const { name, email, password } = req.body || {};
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Name, email, and password required" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+
+    const hashed = await hashPassword(password);
+    const jwtSecret = authConfig.jwtSecret === "minion-secret-change-me"
+      ? randomBytes(32).toString("hex")
+      : authConfig.jwtSecret;
+
+    configStore.updateAuth({
+      enabled: true,
+      adminUser: email,
+      adminPass: hashed,
+      jwtSecret,
+    });
+
+    const token = jwt.sign({ user: email, name, role: "admin" }, jwtSecret, { expiresIn: "8h" });
+    logger.info({ user: email }, "Registration successful");
+    res.json({ token, user: email, name });
+  });
+
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     const authConfig = configStore.getAuth();
     if (!authConfig.enabled) {

@@ -3,7 +3,7 @@ import { colors, fonts, fontSize, radius, spacing, shadows, glass, transition } 
 
 const API = "/api";
 
-type Tab = "minions" | "souls" | "context" | "integrations" | "usage" | "activity" | "proposals";
+type Tab = "minions" | "souls" | "context" | "integrations" | "usage" | "activity" | "breath";
 
 interface MinionConfig {
   id: string;
@@ -124,7 +124,7 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
     { id: "integrations", label: "Integrations" },
     { id: "usage", label: "Usage" },
     { id: "activity", label: "Activity" },
-    { id: "proposals", label: "Proposals" },
+    { id: "breath", label: "Breath" },
   ];
 
   return (
@@ -265,7 +265,7 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
           {tab === "integrations" && <IntegrationsTab onError={setError} />}
           {tab === "usage" && <UsageTab />}
           {tab === "activity" && <ActivityTab />}
-          {tab === "proposals" && <ProposalsTab />}
+          {tab === "breath" && <BreathTab />}
         </div>
       </div>
     </div>
@@ -777,13 +777,115 @@ function ActivityTab() {
 }
 
 // --- Proposals Tab ---
-function ProposalsTab() {
-  const [proposals, setProposals] = useState<any[]>([]);
+function SectionHeader({ icon, title, badge }: { icon: string; title: string; badge?: number }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: spacing.sm,
+      marginBottom: spacing.md,
+    }}>
+      <span style={{ fontSize: fontSize.md }}>{icon}</span>
+      <span style={{
+        fontSize: fontSize.sm, fontWeight: 700, color: colors.gold,
+        fontFamily: fonts.display, letterSpacing: "0.3px",
+      }}>
+        {title}
+      </span>
+      {badge !== undefined && badge > 0 && (
+        <span style={{
+          fontSize: 10, fontWeight: 700,
+          background: "rgba(199, 84, 80, 0.2)",
+          color: colors.error,
+          padding: `1px ${spacing.sm}px`,
+          borderRadius: radius.full,
+          fontFamily: fonts.mono,
+        }}>
+          {badge} pending
+        </span>
+      )}
+    </div>
+  );
+}
+
+function TimelineItem({ item }: { item: any }) {
+  const [expanded, setExpanded] = useState(false);
+  const date = item.createdAt
+    ? new Date(item.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+    : "";
+
+  return (
+    <div style={{
+      display: "flex", gap: spacing.md, position: "relative",
+    }}>
+      {/* Timeline line + dot */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 16 }}>
+        <div style={{
+          width: 8, height: 8, borderRadius: radius.full, flexShrink: 0, marginTop: 4,
+          background: item.type === "chance" ? colors.amber : colors.info,
+          boxShadow: `0 0 6px ${item.type === "chance" ? colors.amber : colors.info}`,
+        }} />
+        <div style={{ flex: 1, width: 1, background: colors.glassBorder, marginTop: spacing.xs }} />
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, paddingBottom: spacing.lg }}>
+        <div
+          style={{ cursor: "pointer" }}
+          onClick={() => setExpanded(!expanded)}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.sm }}>
+            <span style={{
+              fontWeight: 600, fontSize: fontSize.sm, color: colors.text,
+              fontFamily: fonts.sans, lineHeight: 1.4,
+            }}>
+              {item.title}
+            </span>
+            <span style={{
+              fontSize: 10, color: colors.textLight, fontFamily: fonts.mono,
+              flexShrink: 0, marginTop: 2,
+            }}>
+              {date}
+            </span>
+          </div>
+        </div>
+
+        {expanded && (
+          <div style={{ marginTop: spacing.sm }}>
+            <div style={{
+              fontSize: fontSize.xs, color: colors.textMuted,
+              whiteSpace: "pre-wrap", lineHeight: 1.7,
+              ...glass.input, padding: spacing.md, borderRadius: radius.md,
+              fontFamily: fonts.mono,
+            }}>
+              {item.description || "No description"}
+            </div>
+            {item.sources && item.sources.length > 0 && (
+              <div style={{ marginTop: spacing.sm, display: "flex", flexDirection: "column", gap: spacing.xs }}>
+                {item.sources.map((src: string, i: number) => (
+                  <a key={i} href={src} target="_blank" rel="noopener noreferrer" style={{
+                    fontSize: fontSize.xs, color: colors.info,
+                    fontFamily: fonts.mono, textDecoration: "none",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    display: "block",
+                  }}>
+                    ↗ {src}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BreathTab() {
+  const [items, setItems] = useState<any[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    apiFetch("/proposals").then(setProposals).catch(() => {});
+    apiFetch("/proposals").then(setItems).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -792,7 +894,7 @@ function ProposalsTab() {
     return () => clearInterval(iv);
   }, [load]);
 
-  const handleAction = async (id: string, action: "approve" | "reject" | "done") => {
+  const handleAction = async (id: string, action: "approve" | "reject") => {
     setLoading(id);
     try {
       await apiFetch(`/proposals/${id}/${action}`, { method: "POST" });
@@ -807,189 +909,146 @@ function ProposalsTab() {
     low: { bg: "rgba(90, 158, 111, 0.15)", color: colors.success },
   };
 
-  const statusIcon: Record<string, string> = {
-    pending: "~",
-    approved: "+",
-    rejected: "x",
-    done: "ok",
-  };
+  // Separate by type (backward compat: no type = improvement)
+  const improvements = items.filter((p) => p.id !== "init" && (p.type === "improvement" || !p.type));
+  const chances = items
+    .filter((p) => p.type === "chance")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const knowledge = items
+    .filter((p) => p.type === "knowledge")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const pending = proposals.filter((p) => p.status === "pending");
-  const others = proposals.filter((p) => p.status !== "pending" && p.id !== "init");
+  const pendingImprovements = improvements.filter((p) => p.status === "pending");
+  const doneImprovements = improvements.filter((p) => p.status !== "pending");
+
+  const allEmpty = improvements.length === 0 && chances.length === 0 && knowledge.length === 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: spacing.md }}>
-      {pending.length === 0 && others.length === 0 && (
-        <EmptyState text="No proposals yet. The breath system generates improvement proposals overnight." />
+    <div style={{ display: "flex", flexDirection: "column", gap: spacing.xl }}>
+      {allEmpty && (
+        <EmptyState text="No breath data yet. The breath system runs periodically and generates insights." />
       )}
 
-      {pending.length > 0 && (
-        <div style={{
-          fontSize: fontSize.sm, fontWeight: 700, color: colors.gold,
-          marginBottom: spacing.xs, fontFamily: fonts.display,
-        }}>
-          Pending Approval ({pending.length})
-        </div>
-      )}
-
-      {pending.map((p) => {
-        const ps = priorityStyles[p.priority] || priorityStyles.medium;
-        const isExpanded = expanded === p.id;
-
-        return (
-          <div key={p.id} style={{
-            ...glass.card,
-            borderRadius: radius.lg,
-            overflow: "hidden",
-            border: `1px solid ${colors.goldBorder}`,
-          }}>
-            <div
-              style={{
-                padding: `${spacing.md}px ${spacing.lg}px`,
-                cursor: "pointer",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                transition: `background ${transition.fast}`,
-              }}
-              onClick={() => setExpanded(isExpanded ? null : p.id)}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(200, 163, 90, 0.05)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-            >
-              <div style={{ display: "flex", gap: spacing.sm, alignItems: "center", flex: 1, minWidth: 0 }}>
-                {/* Priority badge */}
-                <span style={{
-                  fontSize: 10, fontWeight: 700,
-                  padding: `2px ${spacing.sm}px`,
-                  borderRadius: radius.sm,
-                  background: ps.bg,
-                  color: ps.color,
-                  textTransform: "uppercase",
-                  fontFamily: fonts.mono,
-                  flexShrink: 0,
-                  letterSpacing: "0.5px",
+      {/* IMPROVEMENTS */}
+      {improvements.length > 0 && (
+        <section>
+          <SectionHeader icon="🎯" title="Improvements" badge={pendingImprovements.length} />
+          <div style={{ display: "flex", flexDirection: "column", gap: spacing.md }}>
+            {pendingImprovements.map((p) => {
+              const ps = priorityStyles[p.priority] || priorityStyles.medium;
+              const isExpanded = expanded === p.id;
+              return (
+                <div key={p.id} style={{
+                  ...glass.card, borderRadius: radius.lg, overflow: "hidden",
+                  border: `1px solid ${colors.goldBorder}`,
                 }}>
-                  {p.priority || "medium"}
-                </span>
-
-                {/* Category */}
-                <span style={{
-                  fontSize: 10, color: colors.textLight,
-                  background: colors.glassHighlight,
-                  border: `1px solid ${colors.glassBorder}`,
-                  padding: `2px ${spacing.sm}px`,
-                  borderRadius: radius.sm,
-                  fontFamily: fonts.mono,
-                  flexShrink: 0,
-                }}>
-                  {p.category || "general"}
-                </span>
-
-                {/* Title */}
-                <span style={{
-                  fontWeight: 600, fontSize: fontSize.sm, color: colors.text,
-                  fontFamily: fonts.sans,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
-                  {p.title}
-                </span>
-              </div>
-
-              <span style={{
-                fontSize: 10, color: colors.textLight,
-                transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                transition: `transform ${transition.fast}`,
-                flexShrink: 0, marginLeft: spacing.sm,
-              }}>
-                ▼
-              </span>
-            </div>
-
-            {isExpanded && (
-              <div style={{ padding: `0 ${spacing.lg}px ${spacing.lg}px` }}>
-                <div style={{
-                  fontSize: fontSize.xs, color: colors.textMuted,
-                  whiteSpace: "pre-wrap",
-                  ...glass.input,
-                  padding: spacing.md,
-                  borderRadius: radius.md,
-                  marginBottom: spacing.md,
-                  lineHeight: 1.7,
-                  fontFamily: fonts.mono,
-                }}>
-                  {p.description || "No description"}
-                </div>
-
-                {p.estimatedImpact && (
-                  <div style={{
-                    fontSize: fontSize.xs, color: colors.success,
-                    marginBottom: spacing.md, fontFamily: fonts.sans,
-                  }}>
-                    Expected impact: {p.estimatedImpact}
+                  <div
+                    style={{ padding: `${spacing.md}px ${spacing.lg}px`, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                    onClick={() => setExpanded(isExpanded ? null : p.id)}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(200, 163, 90, 0.05)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  >
+                    <div style={{ display: "flex", gap: spacing.sm, alignItems: "center", flex: 1, minWidth: 0 }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: `2px ${spacing.sm}px`,
+                        borderRadius: radius.sm, background: ps.bg, color: ps.color,
+                        textTransform: "uppercase", fontFamily: fonts.mono, flexShrink: 0,
+                      }}>
+                        {p.priority || "medium"}
+                      </span>
+                      <span style={{
+                        fontWeight: 600, fontSize: fontSize.sm, color: colors.text,
+                        fontFamily: fonts.sans, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {p.title}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: 10, color: colors.textLight,
+                      transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: `transform ${transition.fast}`, flexShrink: 0, marginLeft: spacing.sm,
+                    }}>▼</span>
                   </div>
-                )}
 
-                <div style={{ display: "flex", gap: spacing.sm }}>
-                  <button
-                    onClick={() => handleAction(p.id, "approve")}
-                    disabled={loading === p.id}
-                    style={{
-                      ...btnStyle(colors.success),
-                      padding: `${spacing.sm}px ${spacing.xl}px`,
-                      opacity: loading === p.id ? 0.6 : 1,
-                    }}
-                  >
-                    {loading === p.id ? "Executing..." : "Approve & Execute"}
-                  </button>
-                  <button
-                    onClick={() => handleAction(p.id, "reject")}
-                    disabled={loading === p.id}
-                    style={{
-                      ...btnGhost(),
-                      opacity: loading === p.id ? 0.6 : 1,
-                    }}
-                  >
-                    Reject
-                  </button>
+                  {isExpanded && (
+                    <div style={{ padding: `0 ${spacing.lg}px ${spacing.lg}px` }}>
+                      <div style={{
+                        fontSize: fontSize.xs, color: colors.textMuted, whiteSpace: "pre-wrap",
+                        ...glass.input, padding: spacing.md, borderRadius: radius.md,
+                        marginBottom: spacing.md, lineHeight: 1.7, fontFamily: fonts.mono,
+                      }}>
+                        {p.description || "No description"}
+                      </div>
+                      {p.estimatedImpact && (
+                        <div style={{ fontSize: fontSize.xs, color: colors.success, marginBottom: spacing.md, fontFamily: fonts.sans }}>
+                          Expected impact: {p.estimatedImpact}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: spacing.sm }}>
+                        <button
+                          onClick={() => handleAction(p.id, "approve")}
+                          disabled={loading === p.id}
+                          style={{ ...btnStyle(colors.success), padding: `${spacing.sm}px ${spacing.xl}px`, opacity: loading === p.id ? 0.6 : 1 }}
+                        >
+                          {loading === p.id ? "Executing..." : "Approve & Execute"}
+                        </button>
+                        <button
+                          onClick={() => handleAction(p.id, "reject")}
+                          disabled={loading === p.id}
+                          style={{ ...btnGhost(), opacity: loading === p.id ? 0.6 : 1 }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              );
+            })}
+
+            {doneImprovements.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: spacing.xs, marginTop: spacing.xs }}>
+                <div style={{ fontSize: fontSize.xs, color: colors.textLight, fontFamily: fonts.mono, marginBottom: spacing.xs }}>
+                  — history —
+                </div>
+                {doneImprovements.map((p) => (
+                  <div key={p.id} style={{
+                    padding: `${spacing.sm}px ${spacing.lg}px`, borderRadius: radius.md,
+                    ...glass.card, display: "flex", justifyContent: "space-between", alignItems: "center", opacity: 0.5,
+                  }}>
+                    <span style={{ fontSize: fontSize.xs, color: colors.textMuted, fontFamily: fonts.sans }}>{p.title}</span>
+                    <span style={{
+                      fontSize: 10, fontFamily: fonts.mono,
+                      color: p.status === "completed" ? colors.success : colors.textLight,
+                    }}>
+                      {p.status}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        );
-      })}
+        </section>
+      )}
 
-      {/* Completed proposals */}
-      {others.length > 0 && (
-        <>
-          <div style={{
-            fontSize: fontSize.sm, fontWeight: 700, color: colors.textLight,
-            marginTop: spacing.sm, fontFamily: fonts.display,
-          }}>
-            History
+      {/* CHANCE */}
+      {chances.length > 0 && (
+        <section>
+          <SectionHeader icon="📈" title="Chance" />
+          <div style={{ paddingLeft: spacing.xs }}>
+            {chances.map((item) => <TimelineItem key={item.id} item={item} />)}
           </div>
-          {others.map((p) => (
-            <div key={p.id} style={{
-              padding: `${spacing.sm}px ${spacing.lg}px`,
-              borderRadius: radius.md,
-              ...glass.card,
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              opacity: 0.6,
-            }}>
-              <div style={{ display: "flex", gap: spacing.sm, alignItems: "center" }}>
-                <span style={{
-                  fontFamily: fonts.mono, fontSize: 10,
-                  color: p.status === "approved" ? colors.success : colors.textLight,
-                }}>
-                  [{statusIcon[p.status] || "?"}]
-                </span>
-                <span style={{ fontSize: fontSize.xs, color: colors.textMuted, fontFamily: fonts.sans }}>
-                  {p.title}
-                </span>
-              </div>
-              <span style={{ fontSize: 10, color: colors.textLight, fontFamily: fonts.mono }}>
-                {p.status}
-              </span>
-            </div>
-          ))}
-        </>
+        </section>
+      )}
+
+      {/* KNOWLEDGE */}
+      {knowledge.length > 0 && (
+        <section>
+          <SectionHeader icon="💡" title="Knowledge" />
+          <div style={{ paddingLeft: spacing.xs }}>
+            {knowledge.map((item) => <TimelineItem key={item.id} item={item} />)}
+          </div>
+        </section>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import * as cron from "node-cron";
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from "fs";
 import { resolve } from "path";
+import { EventEmitter } from "events";
 import { ClaudeManager } from "./claude.js";
 import { ChatStore } from "./chat-store.js";
 import { MemoryStore } from "./memory.js";
@@ -20,11 +21,17 @@ const BREATHS_DIR = resolve(import.meta.dirname, "../data/breaths");
 const KNOWLEDGE_DIR = resolve(import.meta.dirname, "../data/knowledge");
 const BREATH_SOUL = resolve(import.meta.dirname, "../souls/breath.md");
 
-const NIGHT_SCHEDULE = "*/10 21-23,0-5 * * *";
-const ALL_DAY_SCHEDULE = "*/10 * * * *";
-const BREATH_STATE_PATH = resolve(import.meta.dirname, "../data/breath-state.json");
+// Parallel breath soul templates (one per agent role)
+const BREATH_SOULS: Record<string, string> = {
+  semar: resolve(import.meta.dirname, "../souls/breath-semar.md"),
+  petruk: resolve(import.meta.dirname, "../souls/breath-petruk.md"),
+  bagong: resolve(import.meta.dirname, "../souls/breath-bagong.md"),
+  gareng: resolve(import.meta.dirname, "../souls/breath-gareng.md"),
+};
 
-export class BreathEngine {
+const BREATH_SCHEDULE = "0 */3 * * *";
+
+export class BreathEngine extends EventEmitter {
   private job: cron.ScheduledTask | null = null;
   private claude: ClaudeManager;
   private chatStore: ChatStore;
@@ -32,7 +39,6 @@ export class BreathEngine {
   private configStore: ConfigStore;
   private breathing = false;
   private breathCount = 0;
-  private manualEnabled = false;
 
   constructor(
     claude: ClaudeManager,
@@ -40,6 +46,7 @@ export class BreathEngine {
     memoryStore: MemoryStore,
     configStore: ConfigStore
   ) {
+    super();
     this.claude = claude;
     this.chatStore = chatStore;
     this.memoryStore = memoryStore;
@@ -48,20 +55,11 @@ export class BreathEngine {
     // Ensure directories exist
     mkdirSync(BREATHS_DIR, { recursive: true });
     mkdirSync(KNOWLEDGE_DIR, { recursive: true });
-
-    // Restore persisted state
-    try {
-      const saved = JSON.parse(readFileSync(BREATH_STATE_PATH, "utf-8"));
-      this.manualEnabled = saved.manualEnabled ?? false;
-    } catch {
-      // No saved state, use default
-    }
   }
 
-  start(nightSchedule = NIGHT_SCHEDULE) {
-    const schedule = this.manualEnabled ? ALL_DAY_SCHEDULE : nightSchedule;
-    this.job = cron.schedule(schedule, () => this.breathe());
-    logger.info({ schedule, manualEnabled: this.manualEnabled }, "Breath engine started — Semar will reflect periodically");
+  start() {
+    this.job = cron.schedule(BREATH_SCHEDULE, () => this.breathe());
+    logger.info({ schedule: BREATH_SCHEDULE }, "Breath engine started — Semar will reflect every 3 hours");
   }
 
   stop() {
@@ -72,42 +70,13 @@ export class BreathEngine {
     }
   }
 
-  /** Enable breath for all hours (manual mode) */
-  enable() {
-    this.manualEnabled = true;
-    this.persistState();
-    // Restart job with all-day schedule
-    this.stop();
-    this.job = cron.schedule(ALL_DAY_SCHEDULE, () => this.breathe());
-    logger.info("Breath manual mode ON — Semar akan nafas sepanjang hari");
-  }
-
-  /** Disable manual mode, back to night-only */
-  disable() {
-    this.manualEnabled = false;
-    this.persistState();
-    // Restart job with night-only schedule
-    this.stop();
-    this.job = cron.schedule(NIGHT_SCHEDULE, () => this.breathe());
-    logger.info("Breath manual mode OFF — Semar balik ke jadwal malem aja");
-  }
-
   /** Get current breath engine status */
   getStatus() {
     return {
-      manualEnabled: this.manualEnabled,
-      schedule: this.manualEnabled ? ALL_DAY_SCHEDULE : NIGHT_SCHEDULE,
+      schedule: BREATH_SCHEDULE,
       breathing: this.breathing,
       breathCount: this.breathCount,
     };
-  }
-
-  private persistState() {
-    try {
-      writeFileSync(BREATH_STATE_PATH, JSON.stringify({ manualEnabled: this.manualEnabled }, null, 2));
-    } catch (err: any) {
-      logger.error({ err: err.message }, "Failed to persist breath state");
-    }
   }
 
   /** Trigger a manual breath cycle */
@@ -163,51 +132,49 @@ export class BreathEngine {
 
     this.breathing = true;
     this.breathCount++;
-    logger.info({ breathId, breathNumber: this.breathCount }, "Semar inhales...");
+    logger.info({ breathId, breathNumber: this.breathCount }, "Parallel breath begins — Semar, Petruk, Bagong inhale together...");
+
+    const breathStartTime = Date.now();
 
     try {
-      // Build reflection context
       const context = this.buildReflectionContext();
-      const breathPrompt = this.buildBreathPrompt(context);
-
-      // Run reflection via Claude CLI (using Semar)
-      const semarConfig = this.configStore.getMinion("semar");
-      if (!semarConfig) {
-        throw new Error("Semar config not found");
-      }
-
-      const semarSoul = this.configStore.loadSystemPrompt(semarConfig);
       const workdir = resolve(import.meta.dirname, "..");
 
-      // Run as Semar with breath prompt
-      await new Promise<void>((resolvePromise, reject) => {
-        const timeout = setTimeout(() => {
-          this.claude.stop("semar");
-          reject(new Error("Breath timeout (5 min)"));
-        }, 5 * 60 * 1000);
+      // Phase 1: Run 3 agents in parallel
+      const [semarResult, petrukResult, bagongResult] = await Promise.allSettled([
+        this.runMinionBreath("semar", context, workdir),
+        this.runMinionBreath("petruk", context, workdir),
+        this.runMinionBreath("bagong", context, workdir),
+      ]);
 
-        const doneHandler = (data: any) => {
-          if (data.minionId === "semar") {
-            clearTimeout(timeout);
-            this.claude.removeListener("done", doneHandler);
-            resolvePromise();
-          }
-        };
+      const phase1Errors = [semarResult, petrukResult, bagongResult]
+        .filter((r) => r.status === "rejected")
+        .map((r) => (r as PromiseRejectedResult).reason?.message || "unknown")
+        .join(", ");
 
-        this.claude.on("done", doneHandler);
+      if (phase1Errors) {
+        logger.warn({ breathId, phase1Errors }, "Some breath agents had errors in phase 1");
+      }
 
-        this.claude.runPrompt("semar", breathPrompt, workdir, {
-          systemPrompt: semarSoul || undefined,
-          allowedTools: "Read,Bash,Glob,Grep,Write,WebFetch,WebSearch",
-          maxTurns: 20,
-        });
+      // Phase 2: Gareng verifies output of phase 1
+      logger.info({ breathId }, "Phase 1 complete. Gareng now verifies...");
+      await this.runMinionBreath("gareng", context, workdir).catch((err) => {
+        logger.warn({ breathId, err: err.message }, "Gareng verification had an error — continuing");
       });
 
       const log = this.saveBreathLog(breathId, startTime, "completed");
       logger.info(
         { breathId, durationMs: Date.now() - startTime },
-        "Semar exhales. Breath complete."
+        "Parallel breath complete. All agents exhale."
       );
+
+      // Emit new proposals added during this breath cycle
+      const newProposals = this.getProposalsSince(breathStartTime);
+      if (newProposals.length > 0) {
+        logger.info({ breathId, count: newProposals.length }, "New proposals from breath — notifying");
+        this.emit("breath:proposals", newProposals);
+      }
+
       return log;
     } catch (err: any) {
       const log = this.saveBreathLog(breathId, startTime, "failed", err.message);
@@ -218,7 +185,121 @@ export class BreathEngine {
     }
   }
 
+  /** Run a single minion's breath task using its dedicated soul template */
+  private runMinionBreath(
+    minionId: string,
+    context: ReturnType<BreathEngine["buildReflectionContext"]>,
+    workdir: string
+  ): Promise<void> {
+    return new Promise<void>((resolvePromise, reject) => {
+      const minionConfig = this.configStore.getMinion(minionId);
+      if (!minionConfig) {
+        reject(new Error(`${minionId} config not found`));
+        return;
+      }
+
+      const soulPrompt = this.configStore.loadSystemPrompt(minionConfig);
+      const breathPrompt = this.buildBreathPromptFor(minionId, context);
+
+      const TIMEOUT_MS = 5 * 60 * 1000;
+      const timeout = setTimeout(() => {
+        this.claude.stop(minionId);
+        reject(new Error(`${minionId} breath timeout (5 min)`));
+      }, TIMEOUT_MS);
+
+      const doneHandler = (data: any) => {
+        if (data.minionId === minionId) {
+          clearTimeout(timeout);
+          this.claude.removeListener("done", doneHandler);
+          logger.info({ minionId }, `${minionId} breath done`);
+          resolvePromise();
+        }
+      };
+
+      this.claude.on("done", doneHandler);
+
+      this.claude.runPrompt(minionId, breathPrompt, workdir, {
+        systemPrompt: soulPrompt || undefined,
+        allowedTools: "Read,Bash,Glob,Grep,Write,WebFetch,WebSearch",
+        maxTurns: 15,
+      });
+
+      logger.info({ minionId }, `${minionId} breath started`);
+    });
+  }
+
+  /** Build a breath prompt for a specific agent using its dedicated soul template */
+  private buildBreathPromptFor(
+    minionId: string,
+    context: ReturnType<BreathEngine["buildReflectionContext"]>
+  ): string {
+    const soulPath = BREATH_SOULS[minionId];
+    let template: string;
+
+    try {
+      template = readFileSync(soulPath, "utf-8");
+    } catch {
+      // Fallback to generic breath.md if agent-specific not found
+      try {
+        template = readFileSync(BREATH_SOUL, "utf-8");
+      } catch {
+        template = "Renungkan semua konteks berikut dan simpan insight ke data/knowledge/";
+      }
+    }
+
+    // Build recent proposals context (for Gareng verification)
+    const recentProposals = this.buildRecentProposalsContext();
+
+    return template
+      .replace("{{recent_chats}}", context.recentChats || "(kosong)")
+      .replace("{{execution_traces}}", context.executionTraces || "(kosong)")
+      .replace("{{memories}}", context.memories || "(kosong)")
+      .replace("{{knowledge_inventory}}", context.knowledgeInventory || "(kosong)")
+      .replace("{{pending_proposals}}", context.pendingProposals || "(kosong)")
+      .replace("{{next_breath_questions}}", context.nextBreathQuestions || "(kosong)")
+      .replace("{{recent_proposals}}", recentProposals || "(belum ada)");
+  }
+
+  /** Build context showing proposals added in the last 30 minutes (for Gareng verification) */
+  private buildRecentProposalsContext(): string {
+    try {
+      const path = resolve(import.meta.dirname, "../data/proposals.json");
+      if (!existsSync(path)) return "Belum ada proposals.";
+
+      const proposals = JSON.parse(readFileSync(path, "utf-8"));
+      const cutoff = Date.now() - 30 * 60 * 1000; // last 30 minutes
+
+      const recent = proposals.filter((p: any) => {
+        const createdAt = new Date(p.createdAt || 0).getTime();
+        return createdAt > cutoff;
+      });
+
+      if (recent.length === 0) return "Belum ada proposals yang ditambahkan dalam 30 menit terakhir.";
+
+      return recent
+        .map((p: any) => `- [${p.type}/${p.priority || "?"}] ${p.title}: ${(p.description || "").slice(0, 100)}`)
+        .join("\n");
+    } catch {
+      return "Gagal baca proposals.";
+    }
+  }
+
   // --- Proposals ---
+
+  /** Get proposals created after a given timestamp (ms) — for post-breath notification */
+  getProposalsSince(sinceMs: number): any[] {
+    try {
+      const path = resolve(import.meta.dirname, "../data/proposals.json");
+      if (!existsSync(path)) return [];
+      const proposals = JSON.parse(readFileSync(path, "utf-8"));
+      return proposals.filter((p: any) => {
+        if (!p.createdAt || p.id === "init") return false;
+        return new Date(p.createdAt).getTime() >= sinceMs;
+      });
+    } catch {
+      return [];
+    }
+  }
 
   getProposals(): any[] {
     try {
@@ -233,7 +314,68 @@ export class BreathEngine {
   }
 
   getPendingProposals(): any[] {
-    return this.getProposals().filter((p: any) => p.status === "pending");
+    return this.getProposals().filter(
+      (p: any) => p.status === "pending" && (p.type === "improvement" || !p.type)
+    );
+  }
+
+  /** Approve + auto-execute a proposal via Semar. Marks completed when done, emits events. */
+  executeProposal(proposalId: string): boolean {
+    const proposals = this.getProposals();
+    const proposal = proposals.find((p: any) => p.id === proposalId);
+    if (!proposal) return false;
+
+    this.updateProposalStatus(proposalId, "approved");
+
+    const semarConfig = this.configStore.getMinion("semar");
+    if (!semarConfig) return false;
+
+    const systemPrompt = this.configStore.loadSystemPrompt(semarConfig);
+    const knowledgeContext = this.memoryStore.buildKnowledgeContext();
+    const minionProjectDir = resolve(import.meta.dirname, "..");
+
+    const executePrompt = `[APPROVED PROPOSAL — EXECUTE]
+
+Proposal ID: ${proposal.id}
+Title: ${proposal.title}
+Description: ${proposal.description || ""}
+Category: ${proposal.category || "general"}
+Priority: ${proposal.priority || "medium"}
+
+Lo adalah Semar. Proposal ini udah di-approve sama user. Sekarang IMPLEMENT proposal ini.
+
+Kerjain di project minion sendiri (working directory = root project minion).
+
+Instruksi:
+1. Pahami apa yang diminta di proposal
+2. Implement perubahan yang diperlukan
+3. JANGAN run \`npm run build\` atau restart — user yang handle itu
+4. Setelah selesai, kasih summary perubahan yang lo buat
+5. Bilang ke user: "Perubahan udah ready. Jalanin \`npm run build && pm2 restart punakawan\` untuk apply."
+
+PENTING: Jangan modify file yang ga relevan. Fokus ke apa yang diminta proposal.`;
+
+    const taskIdPromise = this.claude.runPrompt("semar", executePrompt, minionProjectDir, {
+      systemPrompt: (systemPrompt || "") + knowledgeContext,
+      allowedTools: semarConfig.allowedTools,
+      maxTurns: semarConfig.maxTurns,
+    });
+
+    // Mark completed when the specific task finishes
+    taskIdPromise.then((taskId) => {
+      const onDone = (data: any) => {
+        if (data.taskId !== taskId) return;
+        this.claude.removeListener("done", onDone);
+        this.updateProposalStatus(proposalId, "completed");
+        this.emit("proposal:completed", { proposalId, title: proposal.title });
+      };
+      this.claude.on("done", onDone);
+      // Cleanup if task never finishes within 30 min
+      setTimeout(() => this.claude.removeListener("done", onDone), 30 * 60 * 1000).unref();
+    });
+
+    this.emit("proposal:executing", { proposalId, title: proposal.title });
+    return true;
   }
 
   updateProposalStatus(proposalId: string, status: "approved" | "rejected" | "done" | "completed"): boolean {
@@ -349,32 +491,6 @@ export class BreathEngine {
       : "Belum ada proposals pending.";
 
     return { recentChats, memories, knowledgeInventory, nextBreathQuestions, executionTraces, pendingProposals };
-  }
-
-  private buildBreathPrompt(context: {
-    recentChats: string;
-    memories: string;
-    knowledgeInventory: string;
-    nextBreathQuestions: string;
-    executionTraces: string;
-    pendingProposals: string;
-  }): string {
-    // Load breath.md template
-    let template: string;
-    try {
-      template = readFileSync(BREATH_SOUL, "utf-8");
-    } catch {
-      template = "Renungkan semua konteks berikut dan simpan insight ke data/knowledge/";
-    }
-
-    // Replace placeholders
-    return template
-      .replace("{{recent_chats}}", context.recentChats || "(kosong)")
-      .replace("{{execution_traces}}", context.executionTraces || "(kosong)")
-      .replace("{{memories}}", context.memories || "(kosong)")
-      .replace("{{knowledge_inventory}}", context.knowledgeInventory || "(kosong)")
-      .replace("{{pending_proposals}}", context.pendingProposals || "(kosong)")
-      .replace("{{next_breath_questions}}", context.nextBreathQuestions || "(kosong)");
   }
 
   private saveBreathLog(

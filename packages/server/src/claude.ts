@@ -3,11 +3,13 @@ import { EventEmitter } from "events";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { TraceStore } from "./execution-trace.js";
+import { TraceStore, getLoopThreshold } from "./execution-trace.js";
+import { saveRestartTask, clearRestartTask } from "./restart-task.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, "../data");
 const USAGE_PATH = resolve(DATA_DIR, "usage.json");
+const SESSION_IDS_PATH = resolve(DATA_DIR, "session-ids.json");
 
 interface ChatMessage {
   id: string;
@@ -82,6 +84,8 @@ export class ClaudeManager extends EventEmitter {
   private queues: Map<string, QueuedTask[]> = new Map();
   private usage: UsageStats;
   private taskProgress: Map<string, TaskProgress> = new Map(); // minionId → current task progress
+  // Persist loop interrupt count across session restarts (keyed by taskId)
+  private loopCountByTask: Map<string, number> = new Map();
   public traces = new TraceStore();
 
   constructor() {
@@ -95,6 +99,32 @@ export class ClaudeManager extends EventEmitter {
       }
     } else {
       this.usage = { totalInputTokens: 0, totalOutputTokens: 0, byMinion: {} };
+    }
+    // Load persisted session IDs so --resume works across server restarts
+    if (existsSync(SESSION_IDS_PATH)) {
+      try {
+        const saved = JSON.parse(readFileSync(SESSION_IDS_PATH, "utf-8")) as Record<string, string>;
+        for (const [minionId, sessionId] of Object.entries(saved)) {
+          this.lastSessionIds.set(minionId, sessionId);
+        }
+        console.log(`[claude] Loaded ${this.lastSessionIds.size} session ID(s) from disk`);
+      } catch {
+        console.warn("[claude] Failed to load session IDs from disk");
+      }
+    }
+  }
+
+  private saveSessionIds() {
+    const tmp = SESSION_IDS_PATH + ".tmp";
+    try {
+      const obj: Record<string, string> = {};
+      for (const [minionId, sessionId] of this.lastSessionIds) {
+        obj[minionId] = sessionId;
+      }
+      writeFileSync(tmp, JSON.stringify(obj, null, 2));
+      renameSync(tmp, SESSION_IDS_PATH);
+    } catch (err) {
+      console.error("[claude] Failed to save session IDs:", err);
     }
   }
 
@@ -197,9 +227,17 @@ export class ClaudeManager extends EventEmitter {
 
     const session: ClaudeSession = {
       process: proc, minionId, taskId, messageCounter: 0, lastActivity: Date.now(),
-      workdir, options, originalPrompt: prompt, loopInterruptCount: 0,
+      workdir,
+      // Always embed taskId in options so interrupt/resume preserves it
+      options: { ...(options || {}), _taskId: taskId },
+      originalPrompt: prompt,
+      // Restore loop interrupt count if this task was previously interrupted for loop
+      loopInterruptCount: this.loopCountByTask.get(taskId) || 0,
     };
     this.sessions.set(minionId, session);
+
+    // Save task context — so if server restarts, task can be resumed
+    saveRestartTask(prompt.split("\n")[0].slice(0, 120), minionId, prompt, workdir);
 
     // Start execution trace
     this.traces.startTrace(minionId, prompt);
@@ -278,15 +316,20 @@ export class ClaudeManager extends EventEmitter {
         currentAssistantText = "";
       }
 
-      // Save session ID for future resume (memory persistence)
+      // Save session ID for future resume (memory + disk persistence)
       if (session.sessionId) {
         this.lastSessionIds.set(minionId, session.sessionId);
+        this.saveSessionIds();
         console.log(`[claude] ${minionId} session saved: ${session.sessionId}`);
       }
 
       console.log(`[claude] ${minionId} exited with code ${code}`);
       const trace = this.traces.completeTrace(minionId, code === 0 ? "completed" : "failed");
       this.sessions.delete(minionId);
+      // Clear saved restart task if no other sessions are running
+      if (this.sessions.size === 0) clearRestartTask();
+      // Clean up persisted loop count when task finishes (any outcome)
+      this.loopCountByTask.delete(taskId);
 
       // Finalize task progress
       const progress = this.taskProgress.get(minionId);
@@ -386,56 +429,112 @@ export class ClaudeManager extends EventEmitter {
               // Track as task step
               this.addTaskStep(minionId, block.name, block.input);
 
-              // Loop detection
-              const repeatCount = this.traces.checkToolLoop(minionId, block.name, JSON.stringify(block.input).slice(0, 100));
-              if (repeatCount >= 5) {
-                this.traces.addStep(minionId, { type: "error", content: `Loop detected (${repeatCount}x): ${block.name}` });
+              // Loop detection — full input hash, tool-aware threshold, consecutive streak
+              const fullInput = JSON.stringify(block.input);
+              const repeatCount = this.traces.checkToolLoop(minionId, block.name, fullInput);
+              const loopThreshold = getLoopThreshold(block.name);
+              const warnThreshold = Math.max(loopThreshold - 2, 2);
 
-                if (session.loopInterruptCount >= 2) {
-                  // Already interrupted twice for loop — hard stop to prevent infinite cycle
+              if (repeatCount >= loopThreshold) {
+                this.traces.addStep(minionId, { type: "error", content: `Loop detected (${repeatCount}x): ${block.name}` });
+                const stage = session.loopInterruptCount;
+
+                if (stage >= 3) {
+                  // Stage 4: Hard stop — exhausted all recovery options
                   this.emitChat(minionId, session, {
                     role: "assistant",
-                    content: `Loop tidak bisa diselesaikan setelah ${session.loopInterruptCount} percobaan recovery. Stopping.`,
+                    content: `Loop could not be resolved after ${stage} recovery attempts. Stopping.`,
                   });
                   this.stop(minionId);
                   return;
                 }
 
-                // Interrupt with structured thinking prompt — force reflection before retrying
+                // Persist and increment loop count before recovery
                 session.loopInterruptCount++;
-                this.emitChat(minionId, session, {
-                  role: "assistant",
-                  content: `Loop terdeteksi (${repeatCount}x "${block.name}"). Masuk thinking mode untuk cari approach berbeda...`,
-                });
+                this.loopCountByTask.set(session.taskId, session.loopInterruptCount);
 
-                const thinkingPrompt = `[LOOP RECOVERY — THINKING MODE]
+                if (stage === 0) {
+                  // Stage 1: Structured thinking mode
+                  this.emitChat(minionId, session, {
+                    role: "assistant",
+                    content: `Loop detected (${repeatCount}x "${block.name}"). Entering thinking mode to find a different approach...`,
+                  });
 
-Lo tadi terjebak loop: tool "${block.name}" dipanggil ${repeatCount}x berturut-turut dengan input yang sama.
+                  const thinkingPrompt = `[LOOP RECOVERY — STAGE 1: THINKING MODE]
 
-Sebelum lanjut, lakukan structured thinking dulu:
+You are stuck in a loop: "${block.name}" was called ${repeatCount} times consecutively with identical input.
 
-## 1. Diagnosa
-- Kenapa loop ini terjadi? Apa yang lo harapkan tapi tidak terjadi?
-- Apakah tool "${block.name}" memang tidak cocok untuk step ini?
+Do structured thinking before continuing:
 
-## 2. Goal sesungguhnya
-- Apa hasil akhir yang ingin dicapai dari task ini?
-- Apakah lo sudah terlalu fokus ke satu cara sampai lupa goalnya?
+## 1. Diagnose
+- Why did this loop occur? What did you expect but didn't get?
+- Is "${block.name}" the right tool for this step at all?
 
-## 3. Alternatif approach
-- Sebutkan 2-3 cara berbeda yang bisa mencapai goal yang sama
-- Pilih yang paling efisien dan langsung
+## 2. True goal
+- What is the final outcome you need to achieve?
+- Have you been too fixated on one sub-step and lost sight of the actual goal?
 
-## 4. Eksekusi
-- Jalankan approach yang dipilih, jangan ulangi yang sudah gagal
-- Kalau semua approach tidak memungkinkan, jelaskan kenapa dan minta bantuan user
+## 3. Alternative approaches
+- List 2-3 different ways to achieve the same goal without repeating what failed
+- Pick the most direct one
 
-Mulai dengan menulis hasil thinking lo di atas, lalu langsung eksekusi approach baru.`;
+## 4. Execute
+- Run the new approach immediately — do NOT repeat what already failed
+- If none of the alternatives are viable, clearly explain the blocker and ask the user for help
 
-                this.interrupt(minionId, thinkingPrompt);
+Write your thinking above, then immediately execute the new approach.`;
+
+                  this.interrupt(minionId, thinkingPrompt);
+
+                } else if (stage === 1) {
+                  // Stage 2: Disable the looping tool + thinking mode
+                  const currentTools = (session.options?.allowedTools || "Read,Edit,Bash,Glob,Grep,Write").split(",");
+                  const reducedTools = currentTools.filter((t) => t.trim() !== block.name).join(",") || "Read,Glob,Grep";
+                  // Modify options before interrupt — interrupt captures session.options
+                  if (session.options) {
+                    session.options.allowedTools = reducedTools;
+                  }
+
+                  this.emitChat(minionId, session, {
+                    role: "assistant",
+                    content: `Loop persists (${repeatCount}x "${block.name}"). Disabling "${block.name}" and forcing alternative approach...`,
+                  });
+
+                  const disablePrompt = `[LOOP RECOVERY — STAGE 2: TOOL DISABLED]
+
+"${block.name}" has been DISABLED — you looped on it ${repeatCount} times consecutively.
+
+You must solve the task WITHOUT using "${block.name}".
+
+Available tools: ${reducedTools}
+
+Steps:
+1. Identify exactly what you're trying to achieve
+2. Find an approach that doesn't require "${block.name}"
+3. Execute it immediately
+
+If the task genuinely cannot be completed without "${block.name}", clearly explain the blocker to the user.`;
+
+                  this.interrupt(minionId, disablePrompt);
+
+                } else if (stage === 2) {
+                  // Stage 3: Escalate to user — stop and ask for human input
+                  this.emitChat(minionId, session, {
+                    role: "assistant",
+                    content: `Loop unresolved after 2 recovery attempts on "${block.name}". Stopping and escalating — please provide additional context or a different approach.`,
+                  });
+                  this.emit("loop:escalate", {
+                    minionId,
+                    taskId: session.taskId,
+                    toolName: block.name,
+                    repeatCount,
+                  });
+                  this.stop(minionId);
+                }
+
                 return;
-              } else if (repeatCount >= 3) {
-                this.traces.addStep(minionId, { type: "system", content: `Loop warning: ${repeatCount}x same tool call pattern (${block.name})` });
+              } else if (repeatCount >= warnThreshold) {
+                this.traces.addStep(minionId, { type: "system", content: `Loop warning: ${repeatCount}x consecutive "${block.name}" — approaching threshold (${loopThreshold})` });
               }
 
               this.emitChat(minionId, session, {

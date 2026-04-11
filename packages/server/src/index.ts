@@ -33,6 +33,7 @@ import { GitLabClient } from "./gitlab-client.js";
 import { GitLabPoller } from "./gitlab-poller.js";
 import { VPNManager } from "./vpn.js";
 import { BreathEngine } from "./breathe.js";
+import { saveRestartTask } from "./restart-task.js";
 
 // --- Core services ---
 const configStore = new ConfigStore();
@@ -514,16 +515,6 @@ app.get("/api/breath/status", protect, (_req, res) => {
   res.json(breathEngine.getStatus());
 });
 
-app.post("/api/breath/enable", protect, (_req, res) => {
-  breathEngine.enable();
-  res.json(breathEngine.getStatus());
-});
-
-app.post("/api/breath/disable", protect, (_req, res) => {
-  breathEngine.disable();
-  res.json(breathEngine.getStatus());
-});
-
 // Improvement Proposals
 app.get("/api/proposals", protect, (_req, res) => {
   res.json(breathEngine.getProposals());
@@ -535,60 +526,8 @@ app.get("/api/proposals/pending", protect, (_req, res) => {
 
 app.post("/api/proposals/:id/approve", protect, (req, res) => {
   const proposalId = String(req.params.id);
-  const proposals = breathEngine.getProposals();
-  const proposal = proposals.find((p: any) => p.id === proposalId);
-  if (!proposal) return res.status(404).json({ error: "Proposal not found" });
-
-  breathEngine.updateProposalStatus(proposalId, "approved");
-
-  // Auto-execute: spawn Semar to implement the approved proposal
-  const semarConfig = configStore.getMinion("semar");
-  if (semarConfig) {
-    const systemPrompt = configStore.loadSystemPrompt(semarConfig);
-    const knowledgeContext = memoryStore.buildKnowledgeContext();
-    const minionProjectDir = resolve(".");
-
-    const executePrompt = `[APPROVED PROPOSAL — EXECUTE]
-
-Proposal ID: ${proposal.id}
-Title: ${proposal.title}
-Description: ${proposal.description || ""}
-Category: ${proposal.category || "general"}
-Priority: ${proposal.priority || "medium"}
-
-Lo adalah Semar. Proposal ini udah di-approve sama user. Sekarang IMPLEMENT proposal ini.
-
-Kerjain di project minion sendiri (working directory = root project minion).
-
-Instruksi:
-1. Pahami apa yang diminta di proposal
-2. Implement perubahan yang diperlukan
-3. JANGAN run \`npm run build\` atau restart — user yang handle itu
-4. Setelah selesai, kasih summary perubahan yang lo buat
-5. Bilang ke user: "Perubahan udah ready. Jalanin \`npm run build && pm2 restart punakawan\` untuk apply."
-
-PENTING: Jangan modify file yang ga relevan. Fokus ke apa yang diminta proposal.`;
-
-    // Mark proposal as completed when Semar finishes
-    const proposalDoneHandler = (data: any) => {
-      if (data.minionId === "semar") {
-        claude.removeListener("done", proposalDoneHandler);
-        breathEngine.updateProposalStatus(proposalId, "completed");
-        io.emit("proposal:completed", { proposalId, title: proposal.title });
-      }
-    };
-    claude.once("done", proposalDoneHandler);
-
-    claude.runPrompt("semar", executePrompt, minionProjectDir, {
-      systemPrompt: (systemPrompt || "") + knowledgeContext,
-      allowedTools: semarConfig.allowedTools,
-      maxTurns: semarConfig.maxTurns,
-    });
-
-    // Notify via socket
-    io.emit("proposal:executing", { proposalId, title: proposal.title });
-  }
-
+  const ok = breathEngine.executeProposal(proposalId);
+  if (!ok) return res.status(404).json({ error: "Proposal not found" });
   res.json({ ok: true, status: "approved", executing: true });
 });
 
@@ -809,6 +748,11 @@ claude.on("interrupt", (data) => {
     type: "status",
     summary: `Interrupted: ${data.message.slice(0, 60)}`,
   });
+});
+
+claude.on("loop:escalate", (data: { minionId: string; taskId: string; toolName: string; repeatCount: number }) => {
+  io.emit("loop:escalate", data);
+  telegramBot.notifyLoopEscalate(data.minionId, data.toolName, data.repeatCount).catch(() => {});
 });
 
 claude.on("done", (data) => {
@@ -1062,18 +1006,20 @@ io.on("connection", (socket) => {
   });
 });
 
-// --- Graceful shutdown ---
-function shutdown(signal: string) {
-  logger.info({ signal }, "Shutting down...");
-  chatStore.destroy();
-  claude.stopAll();
-  triggerEngine.stopAll();
-  if (gitlabPoller) gitlabPoller.stop();
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 5000);
-}
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+// --- Restart Task API ---
+app.post("/api/restart-task", protect, (req, res) => {
+  const { context, minionId, prompt, workdir } = req.body as {
+    context?: string;
+    minionId?: string;
+    prompt?: string;
+    workdir?: string;
+  };
+  if (!context) return void res.status(400).json({ error: "context required" });
+  saveRestartTask(context, minionId, prompt, workdir);
+  res.json({ ok: true });
+});
+
+// --- Graceful shutdown (defined after telegramBot init below) ---
 
 // --- Serve frontend static files ---
 const webDistPath = resolve(import.meta.dirname, "../../web/dist");
@@ -1085,13 +1031,81 @@ app.get("/{*path}", (_req, res, next) => {
 });
 
 // --- Start ---
-const telegramBot = new TelegramBot(claude, configStore, vpnManager, memoryStore);
+const telegramBot = new TelegramBot(claude, configStore, vpnManager, memoryStore, io);
+telegramBot.setBreathEngine(breathEngine);
 const slackBot = new SlackBot(claude, configStore);
+
+// Wire breath → Telegram proposal notifications
+breathEngine.on("breath:proposals", (proposals: any[]) => {
+  telegramBot.notifyNewProposals(proposals).catch((e) => logger.error(e, "Failed to notify proposals"));
+});
+
+// Wire proposal completion → socket.io + Telegram notification
+breathEngine.on("proposal:executing", ({ proposalId, title }: any) => {
+  io.emit("proposal:executing", { proposalId, title });
+});
+breathEngine.on("proposal:completed", ({ proposalId, title }: any) => {
+  io.emit("proposal:completed", { proposalId, title });
+  telegramBot.notifyProposalCompleted(proposalId, title).catch(() => {});
+});
 
 const PORT = Number(process.env.PORT) || 3001;
 server.listen(PORT, async () => {
   logger.info({ port: PORT, minions: configStore.getMinions().length }, "Minion Server started");
   await telegramBot.start().catch((e) => logger.error(e, "Telegram bot failed"));
   await slackBot.start().catch((e) => logger.error(e, "Slack bot failed"));
-  breathEngine.start("*/10 21-23,0-5 * * *"); // every 10 min, only 9PM-6AM
+  // Cek task gantung dari sebelum restart — resume kalau ada prompt tersimpan
+  const pendingTask = await telegramBot.notifyPendingRestartTask().catch((e) => {
+    logger.error(e, "Failed to notify restart task");
+    return null;
+  });
+  if (pendingTask?.prompt && pendingTask.minionId && pendingTask.workdir) {
+    const config = configStore.getMinion(pendingTask.minionId);
+    if (config) {
+      const basePrompt = configStore.loadSystemPrompt(config) || "";
+      const knowledgeContext = memoryStore.buildKnowledgeContext();
+      const systemPrompt = (basePrompt + knowledgeContext) || undefined;
+      logger.info({ minionId: pendingTask.minionId }, "Resuming task from before restart");
+      const downtime = Math.round((Date.now() - new Date(pendingTask.timestamp).getTime()) / 1000);
+      const resumePrompt = `[RESUME SETELAH RESTART — ${downtime}s downtime]
+
+Server baru aja restart. Lo tadi lagi ngerjain task ini:
+
+${pendingTask.prompt}
+
+Instruksi:
+1. Cek state saat ini dulu (baca file yang relevan, cek git status, dll)
+2. Lanjutkan task dari titik terakhir — jangan ulangi dari awal kalau sudah ada progress
+3. Kalau task sudah selesai sebelum restart, konfirmasi ke user`;
+      const resumeTaskIdPromise = claude.runPrompt(pendingTask.minionId, resumePrompt, pendingTask.workdir, {
+        systemPrompt,
+        allowedTools: config.allowedTools,
+        maxTurns: config.maxTurns,
+      });
+      // Kirim summary ke Telegram saat task selesai
+      const minionId = pendingTask.minionId;
+      resumeTaskIdPromise.then((resumeTaskId) => {
+        telegramBot.watchRestartTaskCompletion(minionId, resumeTaskId, chatStore);
+      }).catch(() => {});
+    }
+  }
+  // Kabarin user kalau server udah nyala
+  await telegramBot.notifyStartup().catch((e) => logger.error(e, "Failed to notify startup"));
+  breathEngine.start();
 });
+
+// --- Graceful Shutdown ---
+async function gracefulShutdown(signal: string) {
+  logger.info({ signal }, "Shutting down...");
+  chatStore.destroy();
+  claude.stopAll();
+  triggerEngine.stopAll();
+  if (gitlabPoller) gitlabPoller.stop();
+  await telegramBot.notifyShutdown().catch(() => {});
+  await telegramBot.stop().catch(() => {});
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));

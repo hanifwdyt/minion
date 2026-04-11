@@ -39,5 +39,69 @@
     ],
     "id": "mem-1775797169566-09hl",
     "timestamp": 1775797169566
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 4 tool calls",
+    "context": "gua mau u pelajarin jokes jaksel jokes twitter. gaya bahasanya dll. u pro standup comedyan jg. lalu kalo sudah paham, update dah di soul u",
+    "outcome": "success",
+    "tags": [
+      "Read",
+      "Edit",
+      "Bash"
+    ],
+    "id": "mem-1775809089559-yaga",
+    "timestamp": 1775809089559
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 3 tool calls",
+    "context": "nih gua liat si semar lg sibuk nih",
+    "outcome": "success",
+    "tags": [
+      "Read",
+      "Bash"
+    ],
+    "id": "mem-1775814812878-bkjr",
+    "timestamp": 1775814812878
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 2 tool calls",
+    "context": "kasih top 3 news hari ini",
+    "outcome": "success",
+    "tags": [
+      "ToolSearch",
+      "WebSearch"
+    ],
+    "id": "mem-1775857949888-86fk",
+    "timestamp": 1775857949888
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 18 tool calls",
+    "context": "# Nafas Petruk — Improvement Proposals\n\nYo bro, ini waktunya lo Petruk buat **nyari celah improvement** dan nulis proposals yang actionable.\n\nAgent lain lagi ngurus market analysis dan performance review. Lo fokus ke satu hal aja: **bikin proposals yang keren dan realistic**.\n\n---\n\n## Konteks\n\n### Execution Traces (Performa)\n- [semar] completed | 32s | 7 tool calls (Bash) | 0 errors | tokens: 8in/1226out | prompt: \"[RESUME SETELAH RESTART — 128s downtime]\n\nServer baru aja restart. Lo tadi lagi \"",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775874057818-hoqw",
+    "timestamp": 1775874057818
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 6 tool calls",
+    "context": "# Nafas Petruk — Improvement Proposals\n\nYo bro, ini waktunya lo Petruk buat **nyari celah improvement** dan nulis proposals yang actionable.\n\nAgent lain lagi ngurus market analysis dan performance review. Lo fokus ke satu hal aja: **bikin proposals yang keren dan realistic**.\n\n---\n\n## Konteks\n\n### Execution Traces (Performa)\n- [semar] failed | 1s | 0 tool calls () | 0 errors | tokens: 0in/0out | prompt: \"halo\"\n- [semar] failed | 1s | 0 tool calls () | 0 errors | tokens: 0in/0out | prompt: \"resta",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1775876534411-aj3d",
+    "timestamp": 1775876534412
   }
 ]

@@ -7,6 +7,7 @@ import { SidePanel } from "./components/Panel/SidePanel";
 import { TopBar } from "./components/UI/TopBar";
 import { ErrorBoundary } from "./components/UI/ErrorBoundary";
 import { ActivityFeed } from "./components/Panel/ActivityFeed";
+import { LoginScreen } from "./components/UI/LoginScreen";
 import { lazy, Suspense } from "react";
 const Dashboard = lazy(() => import("./components/Dashboard/Dashboard").then((m) => ({ default: m.Dashboard })));
 import { AudioManager } from "./components/UI/AudioManager";
@@ -27,7 +28,9 @@ export default function App() {
   const { sendPrompt, stopMinion, clearMinionChat } = useSocket();
   useKeyboardShortcuts();
   useNotifications();
-  const { minions, selectMinion, activityEvents, activityOpen, setActivityOpen, dashboardOpen, setDashboardOpen, connected } = useStore();
+  const { minions, selectMinion, activityEvents, activityOpen, setActivityOpen, dashboardOpen, setDashboardOpen, connected, isAuthenticated } = useStore();
+
+  if (!isAuthenticated) return <LoginScreen />;
 
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative" }}>

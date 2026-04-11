@@ -1,21 +1,26 @@
 {
-  "totalInputTokens": 56,
-  "totalOutputTokens": 26170,
+  "totalInputTokens": 12146,
+  "totalOutputTokens": 423206,
   "byMinion": {
     "semar": {
-      "inputTokens": 36,
-      "outputTokens": 21500,
-      "prompts": 2
+      "inputTokens": 10965,
+      "outputTokens": 377806,
+      "prompts": 190
     },
     "gareng": {
-      "inputTokens": 7,
-      "outputTokens": 2602,
-      "prompts": 1
+      "inputTokens": 37,
+      "outputTokens": 13116,
+      "prompts": 9
     },
     "bagong": {
-      "inputTokens": 13,
-      "outputTokens": 2068,
-      "prompts": 1
+      "inputTokens": 1096,
+      "outputTokens": 10163,
+      "prompts": 7
+    },
+    "petruk": {
+      "inputTokens": 48,
+      "outputTokens": 22121,
+      "prompts": 8
     }
   }
 }
