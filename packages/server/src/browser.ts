@@ -5,9 +5,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
-// Apply rebrowser-patches to fix CDP leaks that stealth alone doesn't cover
-// (Runtime.enable detection, async hooks, console API interception)
-import "rebrowser-patches";
+// rebrowser-patches must be applied as a CLI step (postinstall), not imported at runtime.
+// Run: npx rebrowser-patches patch --packageName playwright-core
 
 chromium.use(StealthPlugin());
 
