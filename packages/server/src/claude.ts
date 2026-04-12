@@ -29,6 +29,7 @@ interface RunOptions {
   _taskId?: string;   // internal: preserve taskId when dequeuing
   _isReview?: boolean; // internal: this task is a peer review — don't trigger another review
   _isFix?: boolean;   // internal: this task is a post-review fix — don't trigger another review
+  _isResumeRetry?: boolean; // internal: retry after --resume failure — don't retry again
 }
 
 interface ClaudeSession {
@@ -208,7 +209,8 @@ export class ClaudeManager extends EventEmitter {
 
     // Resume previous session for this minion (memory/context persistence)
     const lastSession = this.lastSessionIds.get(minionId);
-    if (lastSession) {
+    const hadResume = !!lastSession && !options?._isResumeRetry;
+    if (lastSession && !options?._isResumeRetry) {
       args.push("--resume", lastSession);
     }
 
@@ -314,6 +316,19 @@ export class ClaudeManager extends EventEmitter {
           content: currentAssistantText.trim(),
         });
         currentAssistantText = "";
+      }
+
+      // Detect --resume failure: non-zero exit with zero output means session ID is stale
+      if (code !== 0 && session.messageCounter === 0 && hadResume) {
+        console.log(`[claude] resume failed for ${minionId}, retrying without --resume`);
+        this.lastSessionIds.delete(minionId);
+        this.saveSessionIds();
+        this.sessions.delete(minionId);
+        this.traces.completeTrace(minionId, "failed");
+        this.loopCountByTask.delete(taskId);
+        this.taskProgress.delete(minionId);
+        this.runPrompt(minionId, prompt, workdir, { ...(options || {}), _isResumeRetry: true });
+        return;
       }
 
       // Save session ID for future resume (memory + disk persistence)

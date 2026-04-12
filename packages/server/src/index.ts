@@ -28,12 +28,16 @@ import { assessPromptRisk } from "./tool-safety.js";
 import { TriggerEngine } from "./triggers.js";
 import { ProjectScanner } from "./project-scanner.js";
 import { ArtifactExtractor } from "./artifacts.js";
+import { runBrowserSession, closeBrowser } from "./browser.js";
 import { GitLabWebhook, GitLabEvent } from "./gitlab.js";
 import { GitLabClient } from "./gitlab-client.js";
 import { GitLabPoller } from "./gitlab-poller.js";
 import { VPNManager } from "./vpn.js";
 import { BreathEngine } from "./breathe.js";
 import { saveRestartTask } from "./restart-task.js";
+import { detectImageRequest, enhanceOrClarify, FalClient } from "./fal.js";
+import { ReminderManager } from "./reminders.js";
+import { JobManager } from "./jobs.js";
 
 // --- Core services ---
 const configStore = new ConfigStore();
@@ -54,8 +58,24 @@ let debateEngine: DebateEngine;
 let approvalManager: ApprovalManager;
 let triggerEngine: TriggerEngine;
 
+// Socket-level pending image clarification: `${socketId}:${minionId}` → true
+const pendingImageClarification = new Map<string, boolean>();
+
 function getMinionName(id: string): string {
   return configStore.getMinion(id)?.name || id;
+}
+
+/** Fast-path summon detection — parses "panggilin Petruk suruh X" without running Semar's Claude */
+function detectSummon(prompt: string): { targetId: string; message: string } | null {
+  const AGENTS: Record<string, string> = { gareng: "gareng", petruk: "petruk", bagong: "bagong" };
+  const match = prompt.match(
+    /(?:panggilin|panggil|suruh|briefin|delegasiin|minta)\s+(gareng|petruk|bagong)(?:\s+(?:suruh|buat|untuk|supaya|biar|kesini|ngadep))?\s*(.*)?/i
+  );
+  if (!match) return null;
+  const targetId = match[1].toLowerCase();
+  if (!AGENTS[targetId]) return null;
+  const message = match[2]?.trim() || "Ndoro manggil lo. Hadir ke chat Telegram lo sekarang.";
+  return { targetId, message };
 }
 
 // Log loaded souls at startup
@@ -460,6 +480,43 @@ app.get("/api/chat/:minionId", protect, (req, res) => {
 
 app.delete("/api/chat/:minionId", protect, (req, res) => {
   chatStore.clear(String(req.params.minionId));
+  res.json({ ok: true });
+});
+
+// Jobs
+app.get("/api/jobs", protect, (_req, res) => {
+  res.json(jobManager.list());
+});
+
+app.post("/api/jobs", protect, (req, res) => {
+  const job = req.body;
+  if (!job || !job.id || !job.type) return res.status(400).json({ error: "Invalid job" });
+  jobManager.add(job);
+  res.json({ ok: true, id: job.id });
+});
+
+app.delete("/api/jobs/:id", protect, (req, res) => {
+  const ok = jobManager.cancel(String(req.params.id));
+  res.json({ ok });
+});
+
+// Browser automation
+app.post("/api/browser/run", protect, async (req, res) => {
+  const { actions, screenshot, viewport, sessionName, login, proxy } = req.body;
+  if (!Array.isArray(actions) || actions.length === 0) {
+    res.status(400).json({ error: "actions array required" });
+    return;
+  }
+  try {
+    const result = await runBrowserSession(actions, { screenshot: screenshot ?? true, viewport, sessionName, login, proxy });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/browser/close", protect, async (_req, res) => {
+  await closeBrowser();
   res.json({ ok: true });
 });
 
@@ -918,6 +975,16 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // Sleep guard — block during rest hours (23:00–05:00 WIB)
+    const jakartaHour = (new Date().getUTCHours() + 7) % 24;
+    if (jakartaHour >= 23 || jakartaHour < 5) {
+      const sleepMsg = "🌙 Punakawan sedang beristirahat, nak. Cape seharian kerja — coba lagi setelah jam 5 pagi ya.";
+      const msg = { id: `sleep-${Date.now()}`, minionId, role: "assistant" as const, content: sleepMsg, timestamp: Date.now() };
+      chatStore.add(minionId, msg);
+      socket.emit("minion:chat", { minionId, message: msg });
+      return;
+    }
+
     chatStore.add(minionId, { id: `user-${Date.now()}`, minionId, role: "user", content: prompt, timestamp: Date.now() });
     activity.add({ minionId, minionName: minionId === "balai" ? "Balai Desa" : getMinionName(minionId), type: "prompt", summary: prompt.slice(0, 80) });
     logger.info({ minion: minionId, promptLen: prompt.length }, "Prompt received");
@@ -987,6 +1054,108 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // Fast-path: Semar summon detection — skip Claude subprocess, directly trigger target agent
+    if (minionId === "semar") {
+      const summon = detectSummon(prompt);
+      if (summon) {
+        const targetConfig = configStore.getMinion(summon.targetId);
+        if (targetConfig) {
+          const basePrompt = configStore.loadSystemPrompt(targetConfig) || "";
+          const memCtx = memoryStore.buildMemoryContext(summon.targetId, summon.message);
+          const knowledgeCtx = memoryStore.buildKnowledgeContext();
+
+          const summonMsgId = `summon-${Date.now()}`;
+          chatStore.add(summon.targetId, { id: summonMsgId, minionId: summon.targetId, role: "user", content: summon.message, timestamp: Date.now() });
+          activity.add({ minionId: summon.targetId, minionName: getMinionName(summon.targetId), type: "prompt", summary: `[semar→${summon.targetId}] ${summon.message.slice(0, 60)}` });
+          io.emit("minion:chat", { minionId: summon.targetId, message: { id: summonMsgId, minionId: summon.targetId, role: "user", content: summon.message, timestamp: Date.now() } });
+
+          // Instant Telegram notification before Claude even starts
+          telegramBot.notifySummon(summon.targetId, getMinionName(summon.targetId), summon.message).catch(() => {});
+
+          claude.runPrompt(summon.targetId, summon.message, resolve(targetConfig.workdir), {
+            systemPrompt: (basePrompt + memCtx + knowledgeCtx) || undefined,
+            allowedTools: targetConfig.allowedTools,
+            maxTurns: targetConfig.maxTurns,
+            model: targetConfig.model,
+          });
+
+          // Instant ack from Semar — no Claude subprocess needed
+          const ackMsg = {
+            id: `semar-ack-${Date.now()}`,
+            minionId: "semar",
+            role: "assistant" as const,
+            content: `${getMinionName(summon.targetId)} udah gue panggilin, nak.`,
+            timestamp: Date.now(),
+          };
+          chatStore.add("semar", ackMsg);
+          io.emit("minion:chat", { minionId: "semar", message: ackMsg });
+          logger.info({ target: summon.targetId, message: summon.message.slice(0, 60) }, "Fast-path summon by Semar");
+          return;
+        }
+      }
+    }
+
+    // Fast-path: Image generation — detect before Claude subprocess
+    const falConfig = configStore.getIntegrations().fal as { enabled?: boolean; apiKey?: string } | undefined;
+    if (falConfig?.enabled && falConfig.apiKey) {
+      const clarKey = `${socket.id}:${minionId}`;
+      const isPendingClarify = pendingImageClarification.get(clarKey);
+      const rawPrompt = isPendingClarify ? prompt : detectImageRequest(prompt);
+
+      if (rawPrompt) {
+        if (isPendingClarify) pendingImageClarification.delete(clarKey);
+
+        // Show typing indicator
+        io.emit("minion:status", { minionId, status: "working" });
+
+        try {
+          const result = await enhanceOrClarify(rawPrompt);
+
+          if (result.action === "clarify") {
+            pendingImageClarification.set(clarKey, true);
+            const clarMsg = {
+              id: `img-clarify-${Date.now()}`,
+              minionId,
+              role: "assistant" as const,
+              content: result.question,
+              timestamp: Date.now(),
+            };
+            chatStore.add(minionId, clarMsg);
+            io.emit("minion:chat", { minionId, message: clarMsg });
+            io.emit("minion:status", { minionId, status: "idle" });
+            return;
+          }
+
+          // Generate 2 variants with enhanced prompt
+          const fal = new FalClient(falConfig.apiKey);
+          const imageUrls = await fal.generateImage(result.prompt, { imageSize: "square" });
+          const imgMsg = {
+            id: `img-${Date.now()}`,
+            minionId,
+            role: "assistant" as const,
+            content: result.prompt,
+            imageUrl: imageUrls[0],
+            timestamp: Date.now(),
+          };
+          chatStore.add(minionId, imgMsg);
+          io.emit("minion:chat", { minionId, message: imgMsg });
+        } catch (err: any) {
+          const errMsg = {
+            id: `img-err-${Date.now()}`,
+            minionId,
+            role: "assistant" as const,
+            content: `Gagal generate gambar: ${err.message}`,
+            timestamp: Date.now(),
+          };
+          chatStore.add(minionId, errMsg);
+          io.emit("minion:chat", { minionId, message: errMsg });
+        }
+
+        io.emit("minion:status", { minionId, status: "idle" });
+        return;
+      }
+    }
+
     claude.runPrompt(minionId, prompt, resolve(config.workdir), {
       systemPrompt: fullSystemPrompt || undefined,
       allowedTools: config.allowedTools,
@@ -1019,6 +1188,47 @@ app.post("/api/restart-task", protect, (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Summon API (Semar-only: panggil agent lain) ---
+app.post("/api/summon/:minionId", protect, (req, res) => {
+  const minionId = String(req.params.minionId);
+  const { prompt, callerMinionId } = req.body as { prompt?: string; callerMinionId?: string };
+
+  if (callerMinionId !== "semar") {
+    return void res.status(403).json({ error: "Only Semar can summon other agents" });
+  }
+  if (!prompt?.trim()) {
+    return void res.status(400).json({ error: "prompt required" });
+  }
+
+  const targetConfig = configStore.getMinion(minionId);
+  if (!targetConfig) {
+    return void res.status(404).json({ error: `Minion "${minionId}" not found` });
+  }
+
+  const basePrompt = configStore.loadSystemPrompt(targetConfig) || "";
+  const memoryContext = memoryStore.buildMemoryContext(minionId, prompt);
+  const knowledgeContext = memoryStore.buildKnowledgeContext();
+  const fullSystemPrompt = basePrompt + memoryContext + knowledgeContext;
+
+  const summonMsgId = `summon-${Date.now()}`;
+  chatStore.add(minionId, { id: summonMsgId, minionId, role: "user", content: prompt, timestamp: Date.now() });
+  activity.add({ minionId, minionName: getMinionName(minionId), type: "prompt", summary: `[summon by semar] ${prompt.slice(0, 60)}` });
+  io.emit("minion:chat", { minionId, message: { id: summonMsgId, minionId, role: "user", content: prompt, timestamp: Date.now() } });
+
+  // Instant Telegram notification before Claude even starts
+  telegramBot.notifySummon(minionId, getMinionName(minionId), prompt).catch(() => {});
+
+  claude.runPrompt(minionId, prompt, resolve(targetConfig.workdir), {
+    systemPrompt: fullSystemPrompt || undefined,
+    allowedTools: targetConfig.allowedTools,
+    maxTurns: targetConfig.maxTurns,
+    model: targetConfig.model,
+  });
+
+  logger.info({ caller: "semar", target: minionId, prompt: prompt.slice(0, 80) }, "Semar summoned agent");
+  res.json({ ok: true, minionId, status: "summoned" });
+});
+
 // --- Graceful shutdown (defined after telegramBot init below) ---
 
 // --- Serve frontend static files ---
@@ -1033,6 +1243,22 @@ app.get("/{*path}", (_req, res, next) => {
 // --- Start ---
 const telegramBot = new TelegramBot(claude, configStore, vpnManager, memoryStore, io);
 telegramBot.setBreathEngine(breathEngine);
+
+// Reminder manager — trigger sends Telegram message to chatId
+const reminderManager = new ReminderManager((chatId, message, reminderId) => {
+  telegramBot.sendReminderNotification(chatId, message).catch(() => {});
+  logger.info({ reminderId, chatId }, "Reminder triggered");
+});
+reminderManager.boot();
+telegramBot.setReminderManager(reminderManager);
+
+// Job manager — scheduled autonomous tasks (claude_task, prayer, message)
+const jobManager = new JobManager((chatId, text) => {
+  telegramBot.sendReminderNotification(chatId, text).catch(() => {});
+});
+jobManager.boot();
+telegramBot.setJobManager(jobManager);
+
 const slackBot = new SlackBot(claude, configStore);
 
 // Wire breath → Telegram proposal notifications
@@ -1091,7 +1317,7 @@ Instruksi:
   }
   // Kabarin user kalau server udah nyala
   await telegramBot.notifyStartup().catch((e) => logger.error(e, "Failed to notify startup"));
-  breathEngine.start();
+  // breathEngine.start(); // DISABLED — breath feature turned off per user request
 });
 
 // --- Graceful Shutdown ---

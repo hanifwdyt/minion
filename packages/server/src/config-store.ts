@@ -32,6 +32,7 @@ export interface AppConfig {
     webhook: { enabled: boolean; secret: string };
     github: { enabled: boolean; webhookSecret: string; defaultReviewer: string; repos: string[] };
     gitlab: { enabled: boolean; webhookSecret: string; instanceURL: string; apiToken: string; defaultReviewer: string; mode: "webhook" | "poll" | "both"; projects: string[] };
+    fal?: { enabled: boolean; apiKey: string };
   };
   auth: {
     enabled: boolean;

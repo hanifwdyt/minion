@@ -6,6 +6,11 @@ import { VPNManager } from "./vpn.js";
 import { MemoryStore } from "./memory.js";
 import { loadRestartTask, clearRestartTask } from "./restart-task.js";
 import type { BreathEngine } from "./breathe.js";
+import { FalClient, detectImageRequest, enhanceOrClarify, analyzeImageForPrompt } from "./fal.js";
+import { ReminderManager, parseReminderIntent, formatReminderConfirmation } from "./reminders.js";
+import type { Reminder } from "./reminders.js";
+import { JobManager, parseJobIntent, formatJobConfirmation } from "./jobs.js";
+import type { ScheduledJob } from "./jobs.js";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -37,6 +42,12 @@ interface TypingSession {
 
 // ── Helpers ───────────────────────────────────────────────────
 
+/** Jakarta WIB = UTC+7. Sleep window: 23:00–05:00 WIB */
+function isJakartaSleepTime(): boolean {
+  const h = (new Date().getUTCHours() + 7) % 24;
+  return h >= 23 || h < 5;
+}
+
 /** Escape HTML special chars for Telegram HTML parse mode */
 function escHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -50,6 +61,9 @@ function escHtml(s: string): string {
 function mdToHtml(text: string): string {
   const slots: string[] = [];
   const ph = (html: string) => { slots.push(html); return `\x01${slots.length - 1}\x01`; };
+
+  // 0. Protect existing Telegram-valid HTML tags (Claude sometimes outputs raw HTML)
+  text = text.replace(/<\/?(b|strong|i|em|u|s|code|pre)>|<a\s[^>]*>|<\/a>/gi, (m) => ph(m));
 
   // 1. Fenced code blocks → <pre><code>
   text = text.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) =>
@@ -195,6 +209,26 @@ export class TelegramBot {
   /** chatId → timestamp of last progress update (for throttling) */
   private lastProgressUpdate: Map<number, number> = new Map();
 
+  /** chatId → pending image clarification (user was asked a follow-up question) */
+  private pendingImageClarification: Map<number, string> = new Map();
+
+  private reminderManager: ReminderManager | null = null;
+  private jobManager: JobManager | null = null;
+
+  setReminderManager(rm: ReminderManager) {
+    this.reminderManager = rm;
+  }
+
+  setJobManager(jm: JobManager) {
+    this.jobManager = jm;
+  }
+
+  /** Send a reminder notification to a specific chatId */
+  async sendReminderNotification(chatId: number, message: string): Promise<void> {
+    if (!this.bot) return;
+    await this.bot.api.sendMessage(chatId, `⏰ <b>Reminder!</b>\n${message}`, { parse_mode: "HTML" }).catch(() => {});
+  }
+
   private static readonly PROGRESS_THROTTLE = 30_000; // 30s
 
   constructor(
@@ -317,6 +351,18 @@ export class TelegramBot {
     await this.bot.api
       .sendMessage(chatId, msg, { parse_mode: "HTML" })
       .catch(() => this.bot?.api.sendMessage(chatId, `⚠️ Loop tidak bisa diselesaikan — ${minionId} stuck di "${toolName}" (${repeatCount}x). Mohon berikan context tambahan.`));
+  }
+
+  /** Kirim notif instan saat Semar memanggil agent lain — sebelum Claude subprocess mulai */
+  async notifySummon(targetId: string, targetName: string, message: string): Promise<void> {
+    const config = this.configStore.getIntegrations().telegram;
+    const chatId = config.allowedUserId;
+    if (!chatId || !this.bot) return;
+
+    const msg = `📣 <b>${targetName}</b> dipanggil Semar!\n<i>${message.slice(0, 100)}</i>`;
+    await this.bot.api
+      .sendMessage(chatId, msg, { parse_mode: "HTML" })
+      .catch(() => this.bot?.api.sendMessage(chatId, `${targetName} dipanggil Semar!`));
   }
 
   /** Kirim notif sesaat sebelum server shutdown/restart */
@@ -855,8 +901,247 @@ export class TelegramBot {
         }
       }
 
+      // ── Sleep guard ───────────────────────────────────────────
+      if (isJakartaSleepTime()) {
+        const msgs = [
+          "🌙 *Punakawan sedang beristirahat.*\n\nCape seharian kerja, nak. Mereka butuh tidur juga.\n\nCoba lagi setelah jam 5 pagi ya — mereka pasti sudah segar dan siap melayani lagi. 🌿",
+          "🌙 *Ssst... Punakawan lagi tidur.*\n\nSudah malam, nak. Istirahat dulu, mereka juga perlu rehat. Jumpa lagi jam 5 pagi! 💤",
+          "🌙 *Maaf, Punakawan lagi istirahat.*\n\nSeharian kerja keras, sekarang giliran mereka istirahat. Coba lagi nanti pagi ya, nak. 🌙",
+        ];
+        const msg = msgs[Math.floor(Math.random() * msgs.length)];
+        await ctx.reply(msg, { parse_mode: "Markdown" });
+        return;
+      }
+
+      // Image generation — detect before routing to Semar
+      // Also handle pending clarification responses
+      const falConfig = this.configStore.getIntegrations().fal as { enabled?: boolean; apiKey?: string } | undefined;
+      if (falConfig?.enabled && falConfig.apiKey) {
+        const chatId = ctx.chat?.id as number;
+
+        // Check if user is answering a clarification question
+        let rawPrompt: string | null = null;
+        if (this.pendingImageClarification.has(chatId)) {
+          rawPrompt = text; // treat full message as the clarification answer
+          this.pendingImageClarification.delete(chatId);
+        } else {
+          rawPrompt = detectImageRequest(text);
+        }
+
+        if (rawPrompt) {
+          await ctx.replyWithChatAction("typing");
+          const result = await enhanceOrClarify(rawPrompt);
+
+          if (result.action === "clarify") {
+            this.pendingImageClarification.set(chatId, rawPrompt);
+            await ctx.reply(result.question);
+            return;
+          }
+
+          // Enhanced prompt — generate 2 variants
+          const enhancedPrompt = result.prompt;
+          await ctx.replyWithChatAction("upload_photo");
+          try {
+            const fal = new FalClient(falConfig.apiKey);
+            const urls = await fal.generateImage(enhancedPrompt, { imageSize: "square" });
+            const caption = `<i>${escHtml(enhancedPrompt.slice(0, 200))}</i>`;
+            await ctx.replyWithPhoto(urls[0], { caption, parse_mode: "HTML" });
+          } catch (err: any) {
+            await ctx.reply(`❌ Gagal generate gambar: ${err.message}`);
+          }
+          return;
+        }
+      }
+
+      // Scheduled Job — detect recurring/complex jobs before reminder check
+      if (this.jobManager) {
+        const parsed = await parseJobIntent(text);
+        if (parsed) {
+          await ctx.replyWithChatAction("typing");
+          const id = `j-${Date.now().toString(36)}`;
+          let job: ScheduledJob;
+
+          if (parsed.type === "prayer") {
+            job = {
+              id, type: "prayer", chatId, label: parsed.label,
+              location: parsed.location || "Jakarta",
+              createdAt: Date.now(), active: true,
+            };
+          } else if (parsed.type === "claude_task") {
+            job = {
+              id, type: "claude_task", chatId, label: parsed.label,
+              cronPattern: parsed.cronPattern!, cronLabel: parsed.cronLabel!,
+              taskPrompt: parsed.taskPrompt!,
+              createdAt: Date.now(), active: true,
+            };
+          } else {
+            job = {
+              id, type: "message", chatId, label: parsed.label,
+              cronPattern: parsed.cronPattern!, cronLabel: parsed.cronLabel!,
+              message: parsed.message || text,
+              createdAt: Date.now(), active: true,
+            };
+          }
+
+          this.jobManager.add(job);
+          await ctx.reply(formatJobConfirmation(job), { parse_mode: "HTML" });
+          return;
+        }
+      }
+
+      // Reminder — detect before routing to Semar
+      if (this.reminderManager) {
+        // Cancel intent: "batalin job/reminder [id]"
+        const cancelJobMatch = text.match(/(?:batalin|cancel|hapus|stop)\s+job\s+([a-z0-9-]+)/i);
+        if (cancelJobMatch && this.jobManager) {
+          const ok = this.jobManager.cancel(cancelJobMatch[1]);
+          await ctx.reply(ok ? `✅ Job <code>${cancelJobMatch[1]}</code> dibatalin.` : `❌ Job <code>${cancelJobMatch[1]}</code> tidak ditemukan.`, { parse_mode: "HTML" });
+          return;
+        }
+
+        const cancelMatch = text.match(/(?:batalin|cancel|hapus|stop)\s+(?:reminder|alarm)\s+([a-z0-9-]+)/i)
+          || text.match(/(?:batalin|cancel|hapus|stop)\s+(?:reminder|alarm)/i);
+        if (cancelMatch) {
+          const id = cancelMatch[1]; // defined if specific id given, undefined for list
+          if (id) {
+            const ok = this.reminderManager.cancel(id);
+            await ctx.reply(ok ? `✅ Reminder <code>${id}</code> dibatalin.` : `❌ Reminder <code>${id}</code> tidak ditemukan.`, { parse_mode: "HTML" });
+          } else {
+            const list = this.reminderManager.list();
+            if (!list.length) {
+              await ctx.reply("Tidak ada reminder aktif.");
+            } else {
+              const lines = list.map(r =>
+                r.type === "once"
+                  ? `• <code>${r.id}</code> — ⏰ ${new Date(r.scheduledAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} — ${r.message}`
+                  : `• <code>${r.id}</code> — 🔁 ${r.cronLabel} — ${r.message}`
+              ).join("\n");
+              await ctx.reply(`Reminder aktif:\n${lines}\n\nKirim "batalin reminder [id]" untuk cancel.`, { parse_mode: "HTML" });
+            }
+          }
+          return;
+        }
+
+        // List intent (reminders + jobs)
+        if (/list\s+(?:reminder|job|semua)|(?:reminder|job)\s+(?:apa|aktif)/i.test(text)) {
+          const jobs = this.jobManager?.list() || [];
+          const reminders = this.reminderManager?.list() || [];
+          if (!jobs.length && !reminders.length) {
+            await ctx.reply("Tidak ada reminder atau job aktif, nak.");
+            return;
+          }
+          const lines: string[] = [];
+          if (jobs.length) {
+            lines.push("<b>Jobs aktif:</b>");
+            jobs.forEach(j => {
+              if (j.type === "prayer") lines.push(`• <code>${j.id}</code> — 🕌 Sholat 5 waktu (${(j as any).location})`);
+              else lines.push(`• <code>${j.id}</code> — ${j.type === "claude_task" ? "🤖" : "💬"} ${(j as any).label} — ${(j as any).cronLabel}`);
+            });
+          }
+          if (reminders.length) {
+            lines.push("\n<b>Reminders:</b>");
+            reminders.forEach(r =>
+              lines.push(r.type === "once"
+                ? `• <code>${r.id}</code> — ⏰ ${new Date(r.scheduledAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} — ${r.message}`
+                : `• <code>${r.id}</code> — 🔁 ${r.cronLabel} — ${r.message}`)
+            );
+          }
+          await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+          return;
+        }
+
+        if (/list\s+reminder|reminder\s+apa|reminder\s+aktif/i.test(text)) {
+          const list = this.reminderManager.list();
+          if (!list.length) {
+            await ctx.reply("Tidak ada reminder aktif, nak.");
+          } else {
+            const lines = list.map(r =>
+              r.type === "once"
+                ? `• <code>${r.id}</code> — ⏰ ${new Date(r.scheduledAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} — ${r.message}`
+                : `• <code>${r.id}</code> — 🔁 ${r.cronLabel} — ${r.message}`
+            ).join("\n");
+            await ctx.reply(lines, { parse_mode: "HTML" });
+          }
+          return;
+        }
+
+        // Create intent
+        const parsed = parseReminderIntent(text);
+        if (parsed && (parsed.scheduledAt || parsed.cronPattern)) {
+          const id = `r-${Date.now().toString(36)}`;
+          const reminder: Reminder = parsed.type === "once"
+            ? { id, type: "once", chatId, message: parsed.message, scheduledAt: parsed.scheduledAt!, createdAt: Date.now() }
+            : { id, type: "recurring", chatId, message: parsed.message, cronPattern: parsed.cronPattern!, cronLabel: parsed.cronLabel!, createdAt: Date.now(), active: true };
+          this.reminderManager.add(reminder);
+          await ctx.reply(formatReminderConfirmation(reminder), { parse_mode: "HTML" });
+          return;
+        }
+      }
+
       // Normal flow → route to Semar
       this.runAndReply(ctx, "semar", text);
+    });
+
+    // ── Photo messages — only analyze+generate if caption has explicit trigger ─
+
+    this.bot.on("message:photo", async (ctx) => {
+      if (this.rejectUnauthorized(ctx)) return;
+
+      const caption = ctx.message.caption?.trim() || "";
+
+      // Check if caption has explicit image-gen trigger
+      const genTriggers = /bikin|buat|generate|jadiin|mirip|rekre|ulang|style|gambar|image|ilustrasi/i;
+      const wantsGenerate = genTriggers.test(caption);
+
+      if (!wantsGenerate) {
+        // No gen trigger — route photo + caption as normal Semar prompt
+        const prompt = caption
+          ? `[User mengirim foto] ${caption}`
+          : "[User mengirim foto tanpa caption]";
+        this.runAndReply(ctx, "semar", prompt);
+        return;
+      }
+
+      const falConfig = this.configStore.getIntegrations().fal as { enabled?: boolean; apiKey?: string } | undefined;
+      if (!falConfig?.enabled || !falConfig.apiKey) {
+        await ctx.reply("Image generation belum diaktifkan, nak.");
+        return;
+      }
+
+      await ctx.replyWithChatAction("typing");
+
+      try {
+        // Get the highest-resolution photo
+        const photos = ctx.message.photo;
+        const largest = photos[photos.length - 1];
+        const file = await ctx.api.getFile(largest.file_id);
+        const token = (this.bot as any).token as string;
+        const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+
+        // Download image
+        const imgRes = await fetch(fileUrl);
+        if (!imgRes.ok) throw new Error(`Failed to download photo: ${imgRes.status}`);
+        const imgBuffer = await imgRes.arrayBuffer();
+        const base64 = Buffer.from(imgBuffer).toString("base64");
+        const mimeType = (file.file_path?.endsWith(".png") ? "image/png" : "image/jpeg") as "image/jpeg" | "image/png";
+
+        // Analyze with Claude vision — pass caption as extra context
+        await ctx.replyWithChatAction("typing");
+        const generatedPrompt = await analyzeImageForPrompt(base64, mimeType, caption || undefined);
+
+        if (!generatedPrompt) throw new Error("Gagal analisis gambar");
+
+        // Generate 2 variants with fal.ai
+        await ctx.replyWithChatAction("upload_photo");
+        const fal = new FalClient(falConfig.apiKey);
+        const urls = await fal.generateImage(generatedPrompt, { imageSize: "square" });
+
+        const photoCaption = `<b>Prompt:</b>\n<i>${escHtml(generatedPrompt.slice(0, 300))}</i>`;
+        await ctx.replyWithPhoto(urls[0], { caption: photoCaption, parse_mode: "HTML" });
+
+      } catch (err: any) {
+        await ctx.reply(`❌ ${err.message}`);
+      }
     });
   }
 

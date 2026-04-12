@@ -15,6 +15,7 @@ import { Toaster } from "./components/UI/Toaster";
 import { useSocket } from "./hooks/useSocket";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useNotifications } from "./hooks/useNotifications";
+import { useSleepMode } from "./hooks/useSleepMode";
 import { useStore } from "./store";
 
 const START_POSITIONS: Record<string, [number, number]> = {
@@ -28,6 +29,7 @@ export default function App() {
   const { sendPrompt, stopMinion, clearMinionChat } = useSocket();
   useKeyboardShortcuts();
   useNotifications();
+  const isSleeping = useSleepMode();
   const { minions, selectMinion, activityEvents, activityOpen, setActivityOpen, dashboardOpen, setDashboardOpen, connected, isAuthenticated } = useStore();
 
   if (!isAuthenticated) return <LoginScreen />;
@@ -71,6 +73,7 @@ export default function App() {
               key={minion.id}
               minion={minion}
               startPosition={START_POSITIONS[minion.id] || [0, 0]}
+              isSleeping={isSleeping}
             />
           ))}
 

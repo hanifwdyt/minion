@@ -57,5 +57,33 @@
     ],
     "id": "mem-1775874014792-naar",
     "timestamp": 1775874014792
+  },
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 3 tool calls",
+    "context": "Bagong, ndoro manggil lo segera! Hadir ke chat Telegram lo sekarang.",
+    "outcome": "success",
+    "tags": [
+      "Read",
+      "Bash"
+    ],
+    "id": "mem-1775884438811-fevj",
+    "timestamp": 1775884438811
+  },
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 14 tool calls",
+    "context": "knp telegram ga jalan ya gua chat ga bales",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Grep",
+      "Read",
+      "Edit"
+    ],
+    "id": "mem-1775895209570-4es6",
+    "timestamp": 1775895209570
   }
 ]

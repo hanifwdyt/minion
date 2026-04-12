@@ -1,0 +1,32 @@
+[
+  {
+    "name": "_ga",
+    "value": "GA1.1.140394601.1775958212",
+    "domain": ".gammasprint.com",
+    "path": "/",
+    "expires": 1810518329.746346,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "_phoenix_session",
+    "value": "bd290270953eb496989606d6d3fd9b10",
+    "domain": "ideuat.gammasprint.com",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "_ga_K94C2RL7TB",
+    "value": "GS2.1.s1775958211$o1$g1$t1775958329$j60$l1$h2058543612",
+    "domain": ".gammasprint.com",
+    "path": "/",
+    "expires": 1810518329.745892,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "Lax"
+  }
+]

@@ -1838,5 +1838,47 @@
     "role": "assistant",
     "content": "3 proposals baru masuk. Ini yang paling critical dari nafas ini:\n\n---\n\n**Problem #1 — Dead Minion, Zero Detection (HIGH)**  \nSemar gagal 10+ tasks berturut-turut. \"halo\", \"restart\", approved proposals — semua masuk blackhole. Tidak ada alert, tidak ada recovery. User harus notice sendiri. Fix: consecutive failure counter → Telegram alert dalam <3 menit → auto-restart.\n\n**Problem #2 — Trace Files Kosong (HIGH)**  \nIni yang bikin gue rada speechless. Semua analisis yang kita lakuin selama ini — termasuk \"Semar punya 48 loop detections\" — itu data dari in-memory yang hilang pas restart. Trace files di disk punya `duration=null`, `toolCallCount=null`, `steps=[]`. Kita udah lama building proposals based on data yang sebenernya ga reliable. Fix: serialize semua data ke disk waktu `completeTrace()` dipanggil.\n\n**Problem #3 — Task Replay Buffer (MEDIUM)**  \nApproved proposals yang sudah di-queue untuk Semar — hilang. Semar down → semua mark failed → gone. Harusnya ada retry buffer dengan backoff, terutama untuk approved proposals.\n\n*\"Gue pernah jadi raja, dan gue tau: sistem yang ga bisa ngawas dirinya sendiri itu bahaya.\"*",
     "timestamp": 1775876533981
+  },
+  {
+    "id": "user-1775882589190",
+    "minionId": "petruk",
+    "role": "user",
+    "content": "halo petruk",
+    "timestamp": 1775882589190
+  },
+  {
+    "id": "petruk-1-1775883870212",
+    "minionId": "petruk",
+    "role": "assistant",
+    "content": "Halo ndoro! Ada yang bisa gue bantu hari ini? 🤙",
+    "timestamp": 1775883870212
+  },
+  {
+    "id": "user-1775883970428",
+    "minionId": "petruk",
+    "role": "user",
+    "content": "halo",
+    "timestamp": 1775883970428
+  },
+  {
+    "id": "petruk-1-1775883974590",
+    "minionId": "petruk",
+    "role": "assistant",
+    "content": "Halo lagi ndoro! 😄 Lo ngirim \"halo\" dua kali — either koneksi lo lag, atau lo lagi nguji apakah gue masih hidup.\n\nGue masih di sini. Ada yang mau dikerjain?",
+    "timestamp": 1775883974590
+  },
+  {
+    "id": "summon-1775884739624",
+    "minionId": "petruk",
+    "role": "user",
+    "content": "Petruk, ndoro manggil lo kesini sekarang!",
+    "timestamp": 1775884739624
+  },
+  {
+    "id": "petruk-1-1775884744549",
+    "minionId": "petruk",
+    "role": "assistant",
+    "content": "*lagi ngopi santai, denger panggilan ndoro, langsung tegak*\n\nSiap ndoro, Petruk dateng! 🫡\n\nMau dikerjain apa nih? Gas aja, gue ready.",
+    "timestamp": 1775884744549
   }
 ]

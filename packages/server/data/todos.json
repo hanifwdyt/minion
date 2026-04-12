@@ -1,0 +1,48 @@
+[
+  {
+    "id": "todo-001",
+    "title": "Adaptive model selection berdasarkan analisa prompt",
+    "description": "Sebelum spawn Claude subprocess, server analisa prompt dulu dan pilih model yang paling efektif: Haiku untuk simple/obrolan, Sonnet untuk coding/analisis, Opus untuk arsitektur kompleks/debugging dalam. Implementasi via selectModel(prompt) di server-side sebelum runPrompt.",
+    "effort": "medium",
+    "risk": "medium",
+    "status": "backlog",
+    "addedAt": "2026-04-11T06:01:30.000Z"
+  },
+  {
+    "id": "todo-002",
+    "title": "OpenRouter integration untuk routing model alternatif",
+    "description": "Route request user tertentu (tamu/channel khusus) ke model via OpenRouter (Llama, Gemini, dll) bukan Claude Anthropic. System prompt sama, provider beda. Perlu: (1) OpenRouter HTTP adapter di claude.ts, (2) field modelProvider di config per minion/user, (3) routing logic berdasarkan siapa yang ngirim.",
+    "effort": "high",
+    "risk": "medium",
+    "status": "backlog",
+    "addedAt": "2026-04-11T06:05:00.000Z"
+  },
+  {
+    "id": "todo-003",
+    "title": "Image generation via fal.ai (Flux Pro)",
+    "description": "Generate gambar dari Telegram/web langsung. Server deteksi keyword (bikin gambar/ilustrasi/trivia visual), hit fal.ai Flux Pro API (~$0.03/gambar), kirim hasil via bot.api.sendPhoto ke Telegram. Fokus: illustration style dan content trivia. Budget: $10 credit = ~333 gambar = 1.5-2 bulan pemakaian (5-6 gambar/hari).",
+    "effort": "medium",
+    "risk": "low",
+    "status": "done",
+    "addedAt": "2026-04-11T06:10:00.000Z"
+  },
+  {
+    "id": "todo-004",
+    "title": "Video generation via fal.ai (Seedance 1.5)",
+    "description": "Generate video pendek dari Telegram. Seedance 1.5: $0.26/video 5 detik 720p. 1 video 1 menit = 12 clip = $3.12. Alternatif lebih murah: slideshow video (image + teks + ffmpeg di server). $10 credit = ~38 video 5 detik.",
+    "effort": "high",
+    "risk": "medium",
+    "priority": "low",
+    "status": "backlog",
+    "addedAt": "2026-04-11T07:02:42.000Z"
+  },
+  {
+    "id": "todo-005",
+    "title": "Setup domain punakawan.hanif.app + SSL",
+    "description": "Arahkan DNS punakawan.hanif.app ke IP server via Porkbun API. Install Caddy sebagai reverse proxy, forward HTTPS:443 ke localhost:3001. Caddy auto-handle SSL via Let's Encrypt. API key Porkbun sudah ada di memory.",
+    "effort": "low",
+    "risk": "low",
+    "status": "backlog",
+    "addedAt": "2026-04-11T08:30:00.000Z"
+  }
+]

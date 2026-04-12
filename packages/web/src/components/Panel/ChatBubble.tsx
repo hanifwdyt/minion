@@ -342,6 +342,32 @@ export const ChatBubble = memo(function ChatBubble({ message, accentColor: _ac, 
           position: "relative",
         }}
       >
+        {/* Image — rendered above text if present */}
+        {message.imageUrl && (
+          <div
+            style={{
+              marginBottom: spacing.sm,
+              borderRadius: radius.md,
+              overflow: "hidden",
+              border: `1px solid ${colors.glassBorder}`,
+              position: "relative",
+            }}
+          >
+            <img
+              src={message.imageUrl}
+              alt={message.content || "Generated image"}
+              style={{
+                display: "block",
+                width: "100%",
+                maxWidth: 360,
+                height: "auto",
+                borderRadius: radius.md,
+              }}
+              loading="lazy"
+            />
+          </div>
+        )}
+
         <div className="markdown-content">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}

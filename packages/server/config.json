@@ -135,6 +135,10 @@
       "enabled": true,
       "apiKey": "pk1_ad4130c93dfe50e386be3661e769bb04827a66498f441b71ab7afb8fd0c0b20a",
       "secretKey": "sk1_d24aed7b2403c46cbd97343456d2ad068eb92255ae81e86431081bebf1f2570f"
+    },
+    "fal": {
+      "enabled": true,
+      "apiKey": "49c144ed-c20d-4155-9bd2-5bdaa29dbdfe:26afd6ae46dd889c0c8fc91107c73ec6"
     }
   },
   "auth": {

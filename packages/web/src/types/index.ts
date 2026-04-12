@@ -27,4 +27,5 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   toolName?: string;
+  imageUrl?: string;
 }
