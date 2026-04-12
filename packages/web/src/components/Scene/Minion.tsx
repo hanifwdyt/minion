@@ -29,9 +29,10 @@ type Expression = "neutral" | "focused" | "happy" | "sad";
 interface MinionProps {
   minion: MinionState;
   startPosition: [number, number];
+  isSleeping?: boolean;
 }
 
-export function Minion({ minion, startPosition }: MinionProps) {
+export function Minion({ minion, startPosition, isSleeping }: MinionProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const [expression, setExpression] = useState<Expression>("neutral");
@@ -41,7 +42,9 @@ export function Minion({ minion, startPosition }: MinionProps) {
 
   // Track expression based on status changes
   useEffect(() => {
-    if (minion.status === "working") {
+    if (isSleeping) {
+      setExpression("focused"); // squinted eyes = sleeping
+    } else if (minion.status === "working") {
       setExpression("focused");
     } else if (minion.status === "error") {
       setExpression("sad");
@@ -54,7 +57,7 @@ export function Minion({ minion, startPosition }: MinionProps) {
       setExpression("neutral");
     }
     prevStatus.current = minion.status;
-  }, [minion.status]);
+  }, [minion.status, isSleeping]);
 
   const moveState = useRef({
     position: new THREE.Vector3(startPosition[0], 0, startPosition[1]),
@@ -100,7 +103,7 @@ export function Minion({ minion, startPosition }: MinionProps) {
 
     if (state.animState === "idle") {
       state.idleTimer -= delta;
-      if (state.idleTimer <= 0) pickNewTarget();
+      if (state.idleTimer <= 0 && !isSleeping) pickNewTarget();
     } else if (state.animState === "walking") {
       const rotDiff = state.targetRotation - state.rotation;
       const normalizedDiff = ((rotDiff + Math.PI) % (Math.PI * 2)) - Math.PI;
