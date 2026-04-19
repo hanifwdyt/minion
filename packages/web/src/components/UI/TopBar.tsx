@@ -7,6 +7,7 @@ import {
   IconCrosshair, IconCamera, IconSettings,
   IconActivity, IconBalai,
 } from "./Icons";
+import type { ChatMessage } from "../../types";
 
 const API = "/api";
 
@@ -41,9 +42,43 @@ function useVpn() {
   return { status, check, connect };
 }
 
+function useStatusButton() {
+  const { minions, selectedMinionId, chatMessages, addChatMessage, setPanelOpen } = useStore();
+  const isBalai = selectedMinionId === "balai";
+  const minion = isBalai
+    ? { id: "balai", name: "Balai Desa", role: "Shared Channel", status: "idle" }
+    : minions.find((m) => m.id === selectedMinionId);
+  const anyWorking = minions.some((m) => m.status === "working");
+
+  const showStatus = useCallback(() => {
+    if (!minion) return;
+    const minionId = isBalai ? "balai" : minion.id;
+    const messages = chatMessages[minionId] || [];
+    const messageCount = messages.filter((m: ChatMessage) => m.role !== "tool").length;
+    const status = isBalai ? (anyWorking ? "working" : "idle") : (minion as any).status;
+    const role = (minion as any).role || "";
+    const content =
+      `**${minion.name}** — ${role}\n` +
+      `- Status: ${status}\n` +
+      `- Messages: ${messageCount}`;
+    const msg: ChatMessage = {
+      id: `sys-status-${Date.now()}`,
+      minionId,
+      role: "assistant",
+      content,
+      timestamp: Date.now(),
+    };
+    addChatMessage(minionId, msg);
+    setPanelOpen(true);
+  }, [minion, isBalai, anyWorking, chatMessages, addChatMessage, setPanelOpen]);
+
+  return { showStatus, hasTarget: !!minion };
+}
+
 export function TopBar() {
   const { minions, connected, selectedMinionId, selectMinion, activityOpen, setActivityOpen, setDashboardOpen, cameraMode, setCameraMode } = useStore();
   const { status: vpnStatus, check: checkVpn, connect: connectVpn } = useVpn();
+  const { showStatus, hasTarget } = useStatusButton();
   const workingCount = minions.filter((m) => m.status === "working").length;
   const isBalaiSelected = selectedMinionId === "balai";
   return (
@@ -128,6 +163,32 @@ export function TopBar() {
 
         {/* VPN Buttons */}
         <VpnButtons status={vpnStatus} onCheck={checkVpn} onConnect={connectVpn} />
+
+        {/* Status Button */}
+        <button
+          onClick={showStatus}
+          disabled={!hasTarget}
+          title="Show minion status"
+          style={{
+            display: "flex", alignItems: "center", gap: 5,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid transparent",
+            borderRadius: radius.md,
+            padding: "5px 8px",
+            cursor: hasTarget ? "pointer" : "default",
+            color: colors.textMuted,
+            fontSize: fontSize.xs,
+            fontFamily: fonts.sans,
+            fontWeight: 500,
+            transition: `all ${transition.normal}`,
+            opacity: hasTarget ? 1 : 0.4,
+          }}
+          onMouseEnter={(e) => { if (hasTarget) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+        >
+          <span style={{ fontSize: 10 }}>◉</span>
+          <span className="hide-mobile">Status</span>
+        </button>
 
         {/* Divider */}
         <div style={{ width: 1, height: 24, background: colors.glassBorder, margin: "0 4px" }} />
