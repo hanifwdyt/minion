@@ -11,6 +11,31 @@ const DATA_DIR = resolve(__dirname, "../data");
 const USAGE_PATH = resolve(DATA_DIR, "usage.json");
 const SESSION_IDS_PATH = resolve(DATA_DIR, "session-ids.json");
 
+const MODEL_OPUS = "claude-opus-4-7";
+const MODEL_SONNET = "claude-sonnet-4-6";
+const MODEL_HAIKU = "claude-haiku-4-5-20251001";
+
+// Dynamic model selection based on prompt complexity
+function selectModel(prompt: string, configModel?: string): string {
+  const p = prompt.toLowerCase().trim();
+  const len = prompt.length;
+
+  // Haiku: greetings, simple status checks, short pings
+  const simplePatterns = /^(halo|hi|hey|hello|tes|test|ping|cek|ok|oke|siap|done|thanks|makasih|mantap|sip|good|bagus|lanjut|lanjutin|selesai|beres)[\s!.?]*$/;
+  if (simplePatterns.test(p) || (len < 60 && /^(cek|lihat|check|status|gmn|gimana|update)/.test(p))) {
+    return MODEL_HAIKU;
+  }
+
+  // Opus: complex tasks — architecture, multi-file, debugging, analysis, planning
+  const heavyKeywords = /(arsitektur|architecture|analisis|analyze|refactor|debug|investigasi|investigate|pipeline|migration|deployment|design|rancang|implement|bikin fitur|tambah fitur|fix bug|review|audit|performance|optimize|strategy|proposal)/;
+  if (heavyKeywords.test(p) || len > 800) {
+    return configModel === MODEL_HAIKU ? MODEL_HAIKU : MODEL_OPUS;
+  }
+
+  // Default: use config model if set, otherwise Sonnet
+  return configModel || MODEL_SONNET;
+}
+
 interface ChatMessage {
   id: string;
   minionId: string;
@@ -197,10 +222,9 @@ export class ClaudeManager extends EventEmitter {
       String(maxTurns),
     ];
 
-    // Model selection per minion
-    if (options?.model) {
-      args.push("--model", options.model);
-    }
+    // Dynamic model selection based on prompt complexity
+    const selectedModel = selectModel(prompt, options?.model);
+    args.push("--model", selectedModel);
 
     // Inject character personality via system prompt
     if (options?.systemPrompt) {
@@ -220,6 +244,17 @@ export class ClaudeManager extends EventEmitter {
     const cleanEnv = { ...process.env, ...(options?.env || {}) };
     delete cleanEnv.CLAUDECODE;
     delete cleanEnv.CLAUDE_CODE_ENTRYPOINT;
+
+    // Inject .env vars if not already present (belt-and-suspenders, works regardless of how PM2 was started)
+    const envFile = resolve("/root/minion/.env");
+    if (existsSync(envFile)) {
+      readFileSync(envFile, "utf-8").split("\n").forEach((line) => {
+        const m = line.match(/^([^#\s=][^=]*)=(.*)$/);
+        if (m && !cleanEnv[m[1].trim()]) {
+          cleanEnv[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, "");
+        }
+      });
+    }
 
     const proc = spawn("claude", args, {
       cwd: workdir,
@@ -339,28 +374,46 @@ export class ClaudeManager extends EventEmitter {
       }
 
       console.log(`[claude] ${minionId} exited with code ${code}`);
-      const trace = this.traces.completeTrace(minionId, code === 0 ? "completed" : "failed");
-      this.sessions.delete(minionId);
-      // Clear saved restart task if no other sessions are running
-      if (this.sessions.size === 0) clearRestartTask();
-      // Clean up persisted loop count when task finishes (any outcome)
-      this.loopCountByTask.delete(taskId);
 
-      // Finalize task progress
-      const progress = this.taskProgress.get(minionId);
-      if (progress) {
-        const lastStep = progress.steps.filter((s: TaskStep) => s.status === "in_progress").pop();
-        if (lastStep) lastStep.status = code === 0 ? "completed" : "failed";
-        this.emit("task:done", { minionId, progress, code });
-        this.taskProgress.delete(minionId);
-      }
+      // Run outcome verification async before completing trace
+      (async () => {
+        const activeTrace = this.traces.getActive(minionId);
+        if (activeTrace && activeTrace.steps.length >= 3 && code !== null) {
+          try {
+            const result = await this.verifyTaskOutcome(prompt, activeTrace.steps, code);
+            this.traces.setQualityScore(minionId, result.score);
+            console.log(`[claude] ${minionId} quality score: ${result.score}/10 — ${result.gap || "ok"}`);
+            if (!result.passed) {
+              this.emit("quality:low", { minionId, taskId, score: result.score, gap: result.gap, prompt });
+            }
+          } catch (err) {
+            console.warn(`[claude] ${minionId} outcome verification failed:`, err);
+          }
+        }
 
-      this.emit("done", { minionId, taskId, code, traceId: trace?.id });
+        const trace = this.traces.completeTrace(minionId, code === 0 ? "completed" : "failed");
+        this.sessions.delete(minionId);
+        // Clear saved restart task if no other sessions are running
+        if (this.sessions.size === 0) clearRestartTask();
+        // Clean up persisted loop count when task finishes (any outcome)
+        this.loopCountByTask.delete(taskId);
 
-      // Process next queued task or go idle
-      if (!this.processNextInQueue(minionId)) {
-        this.emit("status", { minionId, status: "idle" });
-      }
+        // Finalize task progress
+        const progress = this.taskProgress.get(minionId);
+        if (progress) {
+          const lastStep = progress.steps.filter((s: TaskStep) => s.status === "in_progress").pop();
+          if (lastStep) lastStep.status = code === 0 ? "completed" : "failed";
+          this.emit("task:done", { minionId, progress, code });
+          this.taskProgress.delete(minionId);
+        }
+
+        this.emit("done", { minionId, taskId, code, traceId: trace?.id });
+
+        // Process next queued task or go idle
+        if (!this.processNextInQueue(minionId)) {
+          this.emit("status", { minionId, status: "idle" });
+        }
+      })();
     });
 
     proc.on("error", (err) => {
@@ -598,6 +651,83 @@ If the task genuinely cannot be completed without "${block.name}", clearly expla
       toolName: msg.toolName,
     };
     this.emit("chat", { minionId, taskId: session.taskId, message });
+  }
+
+  private async verifyTaskOutcome(
+    originalPrompt: string,
+    steps: import("./execution-trace.js").ExecutionStep[],
+    exitCode: number
+  ): Promise<{ score: number; passed: boolean; gap: string }> {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { score: -1, passed: true, gap: "" };
+
+    // Build compact summary: last 5 reasoning + all tool calls
+    const reasoning = steps
+      .filter((s) => s.type === "reasoning")
+      .slice(-5)
+      .map((s) => s.content.slice(0, 200))
+      .join("\n");
+    const toolCalls = steps
+      .filter((s) => s.type === "tool_call")
+      .map((s) => `${s.toolName}: ${s.content.slice(0, 80)}`)
+      .join("\n");
+    const errors = steps
+      .filter((s) => s.type === "error")
+      .map((s) => s.content.slice(0, 150))
+      .join("\n");
+
+    const verifyPrompt = `You are a task quality evaluator. Rate whether an AI agent completed its task correctly.
+
+Original task:
+${originalPrompt.slice(0, 400)}
+
+What the agent did (tool calls):
+${toolCalls.slice(0, 600) || "(none)"}
+
+Agent reasoning (last steps):
+${reasoning.slice(0, 400) || "(none)"}
+
+Errors encountered:
+${errors.slice(0, 200) || "(none)"}
+
+Exit code: ${exitCode} (0 = success, non-zero = error)
+
+Rate the outcome 0-10:
+- 10: Fully completed, all requirements met
+- 7-9: Mostly done, minor gaps
+- 4-6: Partially done, significant gaps
+- 1-3: Barely started or wrong direction
+- 0: Nothing useful done
+
+Respond ONLY with valid JSON, no explanation:
+{"score": 8, "passed": true, "gap": "describe any gap or empty string if none"}
+
+"passed" is true if score >= 6.`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 150,
+        messages: [{ role: "user", content: verifyPrompt }],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Anthropic API ${res.status}`);
+    const data = await res.json() as any;
+    const text = data.content?.[0]?.text || "{}";
+    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}");
+
+    return {
+      score: typeof parsed.score === "number" ? parsed.score : -1,
+      passed: parsed.passed !== false,
+      gap: parsed.gap || "",
+    };
   }
 
   getUsageStats(): UsageStats {

@@ -2,7 +2,19 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { resolve } from "path";
+import { readFileSync, existsSync } from "fs";
 import rateLimit from "express-rate-limit";
+
+// Load .env from cwd (works regardless of how PM2 starts the process)
+const envFile = resolve(process.cwd(), ".env");
+if (existsSync(envFile)) {
+  readFileSync(envFile, "utf-8").split("\n").forEach((line) => {
+    const m = line.match(/^([^#\s=][^=]*)=(.*)$/);
+    if (m && !process.env[m[1].trim()]) {
+      process.env[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, "");
+    }
+  });
+}
 import { ClaudeManager } from "./claude.js";
 import { ChatStore } from "./chat-store.js";
 import { ConfigStore } from "./config-store.js";
@@ -29,6 +41,9 @@ import { TriggerEngine } from "./triggers.js";
 import { ProjectScanner } from "./project-scanner.js";
 import { ArtifactExtractor } from "./artifacts.js";
 import { runBrowserSession, closeBrowser } from "./browser.js";
+import { postTweet, quoteTweet, replyToTweet, likeTweet, followUser, analyzeProfile, getFollowing, getTimeline, searchTweets, generateTweet, scheduledGenerate, runReplyStrategy, generateThread } from "./twitter.js";
+import cron from "node-cron";
+import { loadQueue, addToQueue, updateTweetStatus, QueuedTweet } from "./tweet-queue.js";
 import { GitLabWebhook, GitLabEvent } from "./gitlab.js";
 import { GitLabClient } from "./gitlab-client.js";
 import { GitLabPoller } from "./gitlab-poller.js";
@@ -500,6 +515,13 @@ app.delete("/api/jobs/:id", protect, (req, res) => {
   res.json({ ok });
 });
 
+// System — restart notification with inline keyboard
+app.post("/api/system/restart-ready", protect, async (req, res) => {
+  const context = req.body?.context as string | undefined;
+  await telegramBot.notifyRestartReady(context).catch(() => {});
+  res.json({ ok: true });
+});
+
 // Browser automation
 app.post("/api/browser/run", protect, async (req, res) => {
   const { actions, screenshot, viewport, sessionName, login, proxy } = req.body;
@@ -518,6 +540,255 @@ app.post("/api/browser/run", protect, async (req, res) => {
 app.post("/api/browser/close", protect, async (_req, res) => {
   await closeBrowser();
   res.json({ ok: true });
+});
+
+// Twitter / X skill endpoints
+app.post("/api/twitter/generate", protect, async (req, res) => {
+  const { character, topic } = req.body;
+  if (!character || !topic) { res.status(400).json({ error: "character and topic required" }); return; }
+  const result = await generateTweet(character, topic);
+  res.json(result);
+});
+
+app.post("/api/twitter/tweet", protect, async (req, res) => {
+  const { text } = req.body;
+  if (!text) { res.status(400).json({ error: "text required" }); return; }
+  const result = await postTweet(text);
+  res.json(result);
+});
+
+app.post("/api/twitter/quote", protect, async (req, res) => {
+  const { tweetUrl, text } = req.body;
+  if (!tweetUrl || !text) { res.status(400).json({ error: "tweetUrl and text required" }); return; }
+  const result = await quoteTweet(tweetUrl, text);
+  res.json(result);
+});
+
+app.post("/api/twitter/reply", protect, async (req, res) => {
+  const { tweetUrl, text } = req.body;
+  if (!tweetUrl || !text) { res.status(400).json({ error: "tweetUrl and text required" }); return; }
+  const result = await replyToTweet(tweetUrl, text);
+  res.json(result);
+});
+
+app.post("/api/twitter/like", protect, async (req, res) => {
+  const { tweetUrl } = req.body;
+  if (!tweetUrl) { res.status(400).json({ error: "tweetUrl required" }); return; }
+  const result = await likeTweet(tweetUrl);
+  res.json(result);
+});
+
+app.post("/api/twitter/follow", protect, async (req, res) => {
+  const { username } = req.body;
+  if (!username) { res.status(400).json({ error: "username required" }); return; }
+  const result = await followUser(username);
+  res.json(result);
+});
+
+app.get("/api/twitter/following/:username", protect, async (req, res) => {
+  const count = parseInt(String(req.query.count || "100"));
+  const result = await getFollowing(String(req.params.username), count);
+  res.json(result);
+});
+
+app.get("/api/twitter/analyze/:username", protect, async (req, res) => {
+  const result = await analyzeProfile(String(req.params.username));
+  res.json(result);
+});
+
+app.get("/api/twitter/timeline", protect, async (req, res) => {
+  const limit = parseInt(String(req.query.limit || "5"));
+  const result = await getTimeline(limit);
+  res.json(result);
+});
+
+app.get("/api/twitter/search", protect, async (req, res) => {
+  const q = String(req.query.q || "");
+  if (!q) { res.status(400).json({ error: "q required" }); return; }
+  const limit = parseInt(String(req.query.limit || "5"));
+  const result = await searchTweets(q, limit);
+  res.json(result);
+});
+
+// ── TWEET QUEUE (persistent, stored on VPS) ───────────────────────────────────
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
+
+function checkWebhookSecret(req: express.Request, res: express.Response): boolean {
+  const secret = req.headers["x-webhook-secret"] || "";
+  if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) {
+    res.status(401).json({ error: "Unauthorized" });
+    return false;
+  }
+  return true;
+}
+
+// List queue — used by x.hanif.app dashboard
+app.get("/api/tweets", async (req, res) => {
+  if (!checkWebhookSecret(req, res)) return;
+  res.json({ tweets: loadQueue() });
+});
+
+// Add to queue — used by x.hanif.app and queue/generate
+app.post("/api/tweets", async (req, res) => {
+  if (!checkWebhookSecret(req, res)) return;
+  const { text, character, topic, targetInteraction } = req.body;
+  if (!text || !character || !topic || !targetInteraction) {
+    res.status(400).json({ error: "Missing fields: text, character, topic, targetInteraction" }); return;
+  }
+  const tweet = addToQueue({ text, character, topic, targetInteraction });
+  res.json({ ok: true, tweet });
+});
+
+// Reject tweet
+app.post("/api/tweets/:id/reject", async (req, res) => {
+  if (!checkWebhookSecret(req, res)) return;
+  const ok = updateTweetStatus(req.params.id, "rejected");
+  res.json({ ok });
+});
+
+// Trigger auto-generate manually (same logic as cron, for testing)
+app.post("/api/twitter/queue/auto", protect, async (req, res) => {
+  try {
+    const { character, topic, targetInteraction } = scheduledGenerate();
+    const gen = await generateTweet(character, topic, targetInteraction);
+    if (!gen.ok || !gen.draft) { res.status(500).json(gen); return; }
+    const tweet = addToQueue({
+      text: gen.draft,
+      character: gen.character as QueuedTweet["character"],
+      topic,
+      targetInteraction: targetInteraction as QueuedTweet["targetInteraction"],
+    });
+    await telegramBot.notifyTweetQueued(character, topic, gen.draft).catch(() => {});
+    res.json({ ok: true, draft: gen.draft, queued: tweet });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Generate tweet → add to queue (internal use)
+app.post("/api/twitter/queue/generate", protect, async (req, res) => {
+  const { character, topic, targetInteraction } = req.body;
+  if (!character || !topic) { res.status(400).json({ error: "character and topic required" }); return; }
+  const gen = await generateTweet(character, topic, targetInteraction || "reply");
+  if (!gen.ok || !gen.draft) { res.status(500).json(gen); return; }
+  const tweet = addToQueue({
+    text: gen.draft,
+    character: gen.character as QueuedTweet["character"],
+    topic,
+    targetInteraction: targetInteraction || "reply",
+  });
+  res.json({ ok: true, draft: gen.draft, queued: tweet });
+});
+
+// Reply strategy — scan trending Indonesia → find tweet → generate reply → queue
+app.post("/api/twitter/queue/reply-strategy", protect, async (req, res) => {
+  const count = Math.min(parseInt(String(req.body.count || "3")), 5);
+  const stratResult = await runReplyStrategy(count);
+  if (!stratResult.ok) { res.status(500).json(stratResult); return; }
+
+  const queued = [];
+  for (const r of stratResult.results || []) {
+    if (!r.reply || !r.character || !r.tweet) continue;
+    const tweet = addToQueue({
+      text: r.reply,
+      character: r.character as QueuedTweet["character"],
+      topic: r.trend,
+      targetInteraction: "reply",
+      replyToId: r.tweet.id,
+      replyToUser: r.tweet.user,
+      replyToText: r.tweet.text,
+    });
+    await telegramBot.notifyTweetQueued(r.character, `Reply ke @${r.tweet.user} re: ${r.trend}`, r.reply).catch(() => {});
+    queued.push(tweet);
+  }
+
+  res.json({ ok: true, queued, total: queued.length });
+});
+
+// Generate thread → queue semua tweet sekaligus
+app.post("/api/twitter/queue/thread", protect, async (req, res) => {
+  const { character, topic, count } = req.body;
+  if (!character || !topic) { res.status(400).json({ error: "character and topic required" }); return; }
+  const tweetCount = Math.min(parseInt(String(count || "4")), 6);
+
+  const gen = await generateThread(character, topic, tweetCount);
+  if (!gen.ok || !gen.tweets?.length) { res.status(500).json(gen); return; }
+
+  const threadId = Date.now().toString();
+  const queued = gen.tweets.map((text, i) => addToQueue({
+    text,
+    character: gen.character as QueuedTweet["character"],
+    topic,
+    targetInteraction: "reply",
+    threadId,
+    threadIndex: i,
+    threadTotal: gen.tweets!.length,
+  }));
+
+  await telegramBot.notifyTweetQueued(
+    character,
+    `Thread [${gen.tweets.length} tweets]: ${topic}`,
+    gen.tweets[0]
+  ).catch(() => {});
+
+  res.json({ ok: true, threadId, queued, total: queued.length });
+});
+
+// Approve thread — post seluruh thread sekaligus (tweet 1, lalu reply chain)
+app.post("/api/tweets/thread/:threadId/post", async (req, res) => {
+  if (!checkWebhookSecret(req, res)) return;
+  const allTweets = loadQueue();
+  const threadTweets = allTweets
+    .filter((t) => t.threadId === req.params.threadId && t.status === "pending")
+    .sort((a, b) => (a.threadIndex ?? 0) - (b.threadIndex ?? 0));
+
+  if (!threadTweets.length) { res.status(404).json({ error: "Thread not found or already processed" }); return; }
+
+  const posted: string[] = [];
+  let prevId: string | null = null;
+
+  for (const tweet of threadTweets) {
+    const result: { ok: boolean; tweetId?: string; error?: string } = prevId
+      ? await replyToTweet(tweet.text, prevId)
+      : await postTweet(tweet.text);
+    if (!result.ok) {
+      res.json({ ok: false, posted, error: result.error, failedAt: tweet.threadIndex });
+      return;
+    }
+    prevId = result.tweetId || null;
+    updateTweetStatus(tweet.id, "posted", { postedAt: new Date().toISOString() });
+    posted.push(tweet.id);
+  }
+
+  res.json({ ok: true, posted, total: posted.length });
+});
+
+// Approve tweet → post to Twitter → mark as posted
+app.post("/api/tweets/:id/post", async (req, res) => {
+  if (!checkWebhookSecret(req, res)) return;
+  const tweets = loadQueue();
+  const tweet = tweets.find((t) => t.id === req.params.id);
+  if (!tweet) { res.status(404).json({ error: "Tweet not found" }); return; }
+  if (tweet.status !== "pending") { res.status(400).json({ error: "Tweet already processed" }); return; }
+  // Support text override — kalau user edit di UI sebelum approve
+  const textToPost = (req.body?.text as string | undefined)?.trim() || tweet.text;
+  // Kalau ini reply, kirim sebagai reply ke tweet asli
+  const result = tweet.replyToId
+    ? await replyToTweet(textToPost, tweet.replyToId)
+    : await postTweet(textToPost);
+  if (result.ok) {
+    updateTweetStatus(tweet.id, "posted", { postedAt: new Date().toISOString() });
+  }
+  res.json(result);
+});
+
+// Legacy webhook endpoint (keep for backwards compat)
+app.post("/api/twitter/webhook/approve", async (req, res) => {
+  if (!checkWebhookSecret(req, res)) return;
+  const { text } = req.body;
+  if (!text) { res.status(400).json({ error: "text required" }); return; }
+  const result = await postTweet(text);
+  res.json(result);
 });
 
 // File changes
@@ -810,6 +1081,16 @@ claude.on("interrupt", (data) => {
 claude.on("loop:escalate", (data: { minionId: string; taskId: string; toolName: string; repeatCount: number }) => {
   io.emit("loop:escalate", data);
   telegramBot.notifyLoopEscalate(data.minionId, data.toolName, data.repeatCount).catch(() => {});
+});
+
+claude.on("quality:low", (data: { minionId: string; taskId: string; score: number; gap: string; prompt: string }) => {
+  io.emit("quality:low", data);
+  const minionName = getMinionName(data.minionId);
+  const taskPreview = data.prompt.split("\n")[0].slice(0, 80);
+  const msg = `⚠️ <b>${minionName}</b> — Low quality score: <b>${data.score}/10</b>\n` +
+    `<i>${taskPreview}${data.prompt.length > 80 ? "..." : ""}</i>\n\n` +
+    (data.gap ? `Gap: ${data.gap}` : "");
+  telegramBot.sendAdminNotification(msg).catch(() => {});
 });
 
 claude.on("done", (data) => {
@@ -1253,9 +1534,19 @@ reminderManager.boot();
 telegramBot.setReminderManager(reminderManager);
 
 // Job manager — scheduled autonomous tasks (claude_task, prayer, message)
-const jobManager = new JobManager((chatId, text) => {
-  telegramBot.sendReminderNotification(chatId, text).catch(() => {});
-});
+const jobManager = new JobManager(
+  (chatId, text) => {
+    telegramBot.sendReminderNotification(chatId, text).catch(() => {});
+  },
+  (minionId, prompt, workdir) => {
+    const config = configStore.getMinion(minionId);
+    if (!config) return;
+    const memCtx = memoryStore.buildMemoryContext(minionId, prompt);
+    const knowledgeCtx = memoryStore.buildKnowledgeContext();
+    const systemPrompt = (configStore.loadSystemPrompt(config) || "") + memCtx + knowledgeCtx;
+    claude.runPrompt(minionId, prompt, resolve(workdir), { systemPrompt });
+  }
+);
 jobManager.boot();
 telegramBot.setJobManager(jobManager);
 
@@ -1293,14 +1584,25 @@ server.listen(PORT, async () => {
       const systemPrompt = (basePrompt + knowledgeContext) || undefined;
       logger.info({ minionId: pendingTask.minionId }, "Resuming task from before restart");
       const downtime = Math.round((Date.now() - new Date(pendingTask.timestamp).getTime()) / 1000);
+
+      // Inject recent conversation history biar Claude langsung punya context
+      const recentMsgs = chatStore.getAll(pendingTask.minionId)
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .slice(-20); // ambil 20 pesan terakhir
+      const historyBlock = recentMsgs.length > 0
+        ? `\nRIWAYAT PERCAKAPAN TERAKHIR (sebelum restart):\n${recentMsgs
+            .map((m) => `[${m.role.toUpperCase()}]: ${String(m.content).slice(0, 500)}`)
+            .join("\n")}\n`
+        : "";
+
       const resumePrompt = `[RESUME SETELAH RESTART — ${downtime}s downtime]
 
 Server baru aja restart. Lo tadi lagi ngerjain task ini:
 
 ${pendingTask.prompt}
-
+${historyBlock}
 Instruksi:
-1. Cek state saat ini dulu (baca file yang relevan, cek git status, dll)
+1. Gunakan riwayat percakapan di atas untuk langsung memahami konteks — JANGAN re-read file yang sudah diketahui dari riwayat
 2. Lanjutkan task dari titik terakhir — jangan ulangi dari awal kalau sudah ada progress
 3. Kalau task sudah selesai sebelum restart, konfirmasi ke user`;
       const resumeTaskIdPromise = claude.runPrompt(pendingTask.minionId, resumePrompt, pendingTask.workdir, {
@@ -1317,6 +1619,35 @@ Instruksi:
   }
   // Kabarin user kalau server udah nyala
   await telegramBot.notifyStartup().catch((e) => logger.error(e, "Failed to notify startup"));
+
+  // ── TWEET AUTO-GENERATOR: 08:00, 12:00, 19:00 WIB (01:00, 05:00, 12:00 UTC) ──
+  async function autoGenerateTweet() {
+    try {
+      const { character, topic, targetInteraction } = scheduledGenerate();
+      logger.info({ character, topic, targetInteraction }, "Auto-generating tweet");
+      const gen = await generateTweet(character, topic, targetInteraction);
+      if (!gen.ok || !gen.draft) {
+        logger.error({ error: gen.error }, "Auto-generate tweet failed");
+        return;
+      }
+      addToQueue({
+        text: gen.draft,
+        character: gen.character as QueuedTweet["character"],
+        topic,
+        targetInteraction: targetInteraction as QueuedTweet["targetInteraction"],
+      });
+      await telegramBot.notifyTweetQueued(character, topic, gen.draft).catch(() => {});
+      logger.info({ character, topic }, "Tweet auto-generated and queued");
+    } catch (e: any) {
+      logger.error({ error: e.message }, "Auto-generate tweet error");
+    }
+  }
+
+  // Tweet auto-generator — DISABLED per user request (akan di-improve dulu)
+  // cron.schedule("0 1 * * *", autoGenerateTweet, { timezone: "UTC" });  // 08:00 WIB
+  // cron.schedule("0 5 * * *", autoGenerateTweet, { timezone: "UTC" });  // 12:00 WIB
+  // cron.schedule("0 12 * * *", autoGenerateTweet, { timezone: "UTC" }); // 19:00 WIB
+  logger.info("Tweet auto-generator: DISABLED (pending improvement)");
   // breathEngine.start(); // DISABLED — breath feature turned off per user request
 });
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useStore } from "../../store";
 import { MuteButton } from "./AudioManager";
 import { colors, fonts, fontSize, shadows, transition, glass, radius } from "../../styles/tokens";
@@ -10,8 +10,40 @@ import {
 
 const API = "/api";
 
+type VpnStatus = "unknown" | "connected" | "disconnected" | "connecting";
+
+function useVpn() {
+  const [status, setStatus] = useState<VpnStatus>("unknown");
+
+  const check = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/vpn/status`);
+      const data = await res.json();
+      if (data.waitingApproval) setStatus("connecting");
+      else setStatus(data.connected ? "connected" : "disconnected");
+    } catch {
+      setStatus("unknown");
+    }
+  }, []);
+
+  useEffect(() => { check(); }, [check]);
+
+  const connect = useCallback(async () => {
+    setStatus("connecting");
+    try {
+      await fetch(`${API}/vpn/connect`, { method: "POST" });
+      await check();
+    } catch {
+      setStatus("disconnected");
+    }
+  }, [check]);
+
+  return { status, check, connect };
+}
+
 export function TopBar() {
   const { minions, connected, selectedMinionId, selectMinion, activityOpen, setActivityOpen, setDashboardOpen, cameraMode, setCameraMode } = useStore();
+  const { status: vpnStatus, check: checkVpn, connect: connectVpn } = useVpn();
   const workingCount = minions.filter((m) => m.status === "working").length;
   const isBalaiSelected = selectedMinionId === "balai";
   return (
@@ -93,6 +125,9 @@ export function TopBar() {
         >
           <IconActivity size={14} />
         </IconBtn>
+
+        {/* VPN Buttons */}
+        <VpnButtons status={vpnStatus} onCheck={checkVpn} onConnect={connectVpn} />
 
         {/* Divider */}
         <div style={{ width: 1, height: 24, background: colors.glassBorder, margin: "0 4px" }} />
@@ -216,6 +251,84 @@ export function TopBar() {
         )}
       </nav>
     </header>
+  );
+}
+
+function VpnButtons({ status, onCheck, onConnect }: {
+  status: VpnStatus;
+  onCheck: () => void;
+  onConnect: () => void;
+}) {
+  const isConnected = status === "connected";
+  const isConnecting = status === "connecting";
+
+  const statusColor = isConnected ? colors.success
+    : isConnecting ? colors.gold
+    : status === "disconnected" ? colors.error
+    : colors.textMuted;
+
+  const statusLabel = isConnected ? "VPN: Connected"
+    : isConnecting ? "VPN: Connecting…"
+    : status === "disconnected" ? "VPN: Disconnected"
+    : "VPN: Unknown";
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      {/* Status dot + label */}
+      <button
+        onClick={onCheck}
+        title={statusLabel}
+        style={{
+          display: "flex", alignItems: "center", gap: 5,
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid transparent",
+          borderRadius: radius.md,
+          padding: "5px 8px",
+          cursor: "pointer",
+          color: statusColor,
+          fontSize: fontSize.xs,
+          fontFamily: fonts.sans,
+          fontWeight: 500,
+          transition: `all ${transition.normal}`,
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
+        onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
+      >
+        <span style={{
+          width: 6, height: 6, borderRadius: "50%",
+          background: statusColor,
+          animation: isConnecting ? "statusPulse 1.5s infinite" : "none",
+          flexShrink: 0,
+        }} />
+        <span className="hide-mobile">VPN</span>
+      </button>
+
+      {/* Connect button — only show when disconnected */}
+      {!isConnected && (
+        <button
+          onClick={onConnect}
+          disabled={isConnecting}
+          title="Connect VPN"
+          style={{
+            background: isConnecting ? "rgba(200,163,90,0.08)" : "rgba(255,255,255,0.03)",
+            border: isConnecting ? `1px solid ${colors.goldBorder}` : "1px solid transparent",
+            borderRadius: radius.md,
+            padding: "5px 8px",
+            cursor: isConnecting ? "default" : "pointer",
+            color: isConnecting ? colors.gold : colors.textMuted,
+            fontSize: fontSize.xs,
+            fontFamily: fonts.sans,
+            fontWeight: 500,
+            transition: `all ${transition.normal}`,
+            opacity: isConnecting ? 0.7 : 1,
+          }}
+          onMouseEnter={(e) => { if (!isConnecting) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+          onMouseLeave={(e) => { if (!isConnecting) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+        >
+          {isConnecting ? "Connecting…" : "Connect"}
+        </button>
+      )}
+    </div>
   );
 }
 

@@ -9,7 +9,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "start": "node packages/server/dist/index.js",
-    "go": "pm2 start packages/server/dist/index.js --name punakawan",
+    "go": "pm2 start packages/server/dist/index.js --name punakawan --node-args='--env-file=.env'",
     "lint": "turbo lint"
   },
   "packageManager": "npm@11.6.0",

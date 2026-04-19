@@ -116,6 +116,11 @@ export class TraceStore {
     return state.count;
   }
 
+  setQualityScore(minionId: string, score: number): void {
+    const trace = this.activeTraces.get(minionId);
+    if (trace) trace.qualityScore = score;
+  }
+
   updateUsage(minionId: string, input: number, output: number): void {
     const trace = this.activeTraces.get(minionId);
     if (!trace) return;

@@ -28,15 +28,16 @@ export async function analyzeImageForPrompt(imageBase64: string, mimeType: strin
     headers: {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      "anthropic-beta": "prompt-caching-2024-07-31",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       model: ENHANCE_MODEL,
       max_tokens: 400,
-      system: `Kamu adalah prompt engineer untuk AI image generator (Flux Pro).
+      system: [{ type: "text", text: `Kamu adalah prompt engineer untuk AI image generator (Flux Pro).
 Analisis gambar yang diberikan user secara detail: subjek utama, gaya visual/art style, warna dominan, pencahayaan, komposisi, mood, dan detail-detail penting lainnya.
 Buat prompt image generation dalam bahasa Inggris yang mendeskripsikan apa yang ada di gambar dengan sangat detail dan vivid — sehingga AI bisa mereproduksi gambar serupa.
-Balas HANYA dengan prompt text saja, tanpa penjelasan, tanpa kalimat pembuka.`,
+Balas HANYA dengan prompt text saja, tanpa penjelasan, tanpa kalimat pembuka.`, cache_control: { type: "ephemeral" } }],
       messages: [
         {
           role: "user",
@@ -86,12 +87,13 @@ export async function enhanceOrClarify(rawPrompt: string): Promise<EnhanceResult
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: ENHANCE_MODEL,
         max_tokens: 300,
-        system: ENHANCE_SYSTEM,
+        system: [{ type: "text", text: ENHANCE_SYSTEM, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: rawPrompt }],
       }),
     });

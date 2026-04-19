@@ -6,9 +6,9 @@ import { logger } from "./logger.js";
 const execAsync = promisify(exec);
 
 const GITLAB_HOST = "mygitlab-dev.ioh.co.id";
-const CONNECT_TIMEOUT = 30_000; // 30s initial wait
-const APPROVAL_TIMEOUT = 120_000; // 2min wait for Silverfort approval
-const POLL_INTERVAL = 5_000; // 5s between connectivity checks
+const CONNECT_TIMEOUT = 10_000;   // 10s — cukup untuk detect Silverfort approval
+const APPROVAL_TIMEOUT = 120_000; // 2min total wait after button shown
+const POLL_INTERVAL = 1_000;      // 1s — biar cepat detect begitu approved
 
 export class VPNManager extends EventEmitter {
   private connecting = false;
@@ -67,9 +67,7 @@ export class VPNManager extends EventEmitter {
     // Connection not established — likely waiting for Silverfort approval
     logger.info("[vpn] Waiting for Silverfort approval...");
     this.waitingApproval = true;
-    this.emit("needs_approval", {
-      message: "VPN butuh approval Silverfort. Approve di HP lo ya, terus bilang 'udah approve'.",
-    });
+    this.emit("needs_approval");
 
     // Poll for up to 2 minutes waiting for user to approve
     const approvedConnected = await this.pollConnectivity(APPROVAL_TIMEOUT);

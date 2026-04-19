@@ -4,11 +4,14 @@
     "type": "claude_task",
     "chatId": 8201379069,
     "label": "Hadits Pagi",
-    "cronPattern": "0 0 * * *",
+    "cronPattern": "0 7 * * *",
     "cronLabel": "Setiap pagi jam 7 WIB",
     "taskPrompt": "Bagikan satu hadits Islam yang inspiratif dan relevan untuk memulai pagi hari. Sertakan: teks hadits dalam Arab dan terjemahan Indonesia, perawi singkat, dan satu hikmah praktis dari hadits tersebut. Format ringkas tapi bermakna, cocok dibaca pagi hari.",
     "createdAt": "2026-04-11T15:04:35.457610Z",
-    "active": true
+    "active": true,
+    "lastRunAt": "2026-04-19T00:00:00.015Z",
+    "lastStatus": "error",
+    "lastError": "Claude API 401"
   },
   {
     "id": "j-dream-mode",
@@ -16,6 +19,15 @@
     "chatId": 8201379069,
     "label": "Sleep & Dream Mode",
     "createdAt": "2026-04-11T15:20:49.781832Z",
+    "active": true
+  },
+  {
+    "id": "j-prayer-1tu2o6",
+    "type": "prayer",
+    "chatId": 8201379069,
+    "label": "Pengingat Sholat 5 Waktu",
+    "location": "Depok",
+    "createdAt": "2026-04-12T09:00:00.000Z",
     "active": true
   }
 ]

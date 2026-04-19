@@ -103,5 +103,361 @@
     ],
     "id": "mem-1775876534411-aj3d",
     "timestamp": 1775876534412
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 3 tool calls",
+    "context": "skill apa yg bisa kita pake ya https://github.com/glebis/claude-skills",
+    "outcome": "success",
+    "tags": [
+      "ToolSearch",
+      "Bash"
+    ],
+    "id": "mem-1776078873678-d8em",
+    "timestamp": 1776078873678
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 6 tool calls",
+    "context": "analisis ini deh https://github.com/vas3k/TaxHacker",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776079918616-syxz",
+    "timestamp": 1776079918616
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 15 tool calls",
+    "context": "Fix pipeline failure di MR !542 repo ide-phoenix (/root/repos/ide-phoenix). Branch: fix/activation-initial-child-delay. Failed jobs: code-quality (unit-test).\n\nLogs:\n=== code-quality (stage: unit-test) ===\nl-coe/div-smb-digital-product/ide-phoenix/spec/requests/customers/verifications_spec.rb\n     # Not yet implemented\n     # ./spec/requests/customers/verifications_spec.rb:14\n\n  3) orders/index.html.erb add some examples to (or delete) /builds/cco/cmo/group-digital-coe/div-smb-digital-product/id",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read",
+      "Edit"
+    ],
+    "id": "mem-1776080143933-0wi2",
+    "timestamp": 1776080143933
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 14 tool calls",
+    "context": "petruk sama ini minta tolong  , soal restart pm2 restart punakawan ini. bikin button ui deh di telegram punakawannya ini, jadi gua gaperlu chat u atau apa. itu button ada terus dan gua bisa pencet terus kapanpun, dan u tau kalo gua pencet itu artinya u harus restart. ini pengubahan di scope si telegram ui aja, bukan di telegram chat bubble",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read",
+      "Edit"
+    ],
+    "id": "mem-1776148372604-2lzn",
+    "timestamp": 1776148372604
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 2 tool calls",
+    "context": "bukan, ini lagi dikerjain semar keknya truk. dia lagi ngerjain apa u tau ga",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read"
+    ],
+    "id": "mem-1776156844839-9ej7",
+    "timestamp": 1776156844839
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 7 tool calls",
+    "context": "bantuin dia coba",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read"
+    ],
+    "id": "mem-1776156953741-elko",
+    "timestamp": 1776156953741
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 41 tool calls",
+    "context": "Fix pipeline failure di MR !535 repo ide-phoenix (/root/repos/ide-phoenix). Branch: fix/minor-cpp-flow-ui. Failed jobs: code-quality (unit-test).\n\nLogs:\n=== code-quality (stage: unit-test) ===\ndigital-product/ide-phoenix/app/mailers/document_rejection_mailer.rb\n20.37% /builds/cco/cmo/group-digital-coe/div-smb-digital-product/ide-phoenix/app/controllers/admin/siebel_files_controller.rb\n20.45% /builds/cco/cmo/group-digital-coe/div-smb-digital-product/ide-phoenix/app/services/orders/postpaid_packag",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read",
+      "Edit"
+    ],
+    "id": "mem-1776157727398-mf3x",
+    "timestamp": 1776157727398
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 2 tool calls",
+    "context": "top 3 news dunia beserta keterangan waktu",
+    "outcome": "success",
+    "tags": [
+      "ToolSearch",
+      "WebSearch"
+    ],
+    "id": "mem-1776243195200-0bd0",
+    "timestamp": 1776243195200
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 2 tool calls",
+    "context": "oke coba kasih penjelasan detail yg no 3",
+    "outcome": "success",
+    "tags": [
+      "WebSearch"
+    ],
+    "id": "mem-1776243321766-1s4j",
+    "timestamp": 1776243321766
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 2 tool calls",
+    "context": "udah ada hasilnya semar?",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776316407287-bs55",
+    "timestamp": 1776316407287
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "tungguin aja",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776316446512-jj7e",
+    "timestamp": 1776316446512
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "gmn semar udah selesai?",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776316984621-v5ri",
+    "timestamp": 1776316984621
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 4 tool calls",
+    "context": "sekarang gua mau cek ide phoenix nih.",
+    "outcome": "success",
+    "tags": [
+      "Skill",
+      "Bash"
+    ],
+    "id": "mem-1776319208158-3ww3",
+    "timestamp": 1776319208158
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "networking.gke.io/v1beta1.FrontendConfig: ah-frontend-config\nEvents:\n  Type    Reason  Age                  From                     Message\n  ----    ------  ----                 ----                     -------\n  Normal  Sync    6s (x1670 over 11d)  loadbalancer-controller  Scheduled for sync\n\nini semar cek",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776324039917-65lv",
+    "timestamp": 1776324039917
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 5 tool calls",
+    "context": "ini petruk cek semar lagi ngapain",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776342228764-fy17",
+    "timestamp": 1776342228764
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "petruk cek semar lagi ngapain",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776352381567-yhdg",
+    "timestamp": 1776352381567
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 5 tool calls",
+    "context": "hi petruk . opus saat ini update ke 4.7 nah ini kita kalo pake opus otomatis pake version itu kan?",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776385154887-1zz0",
+    "timestamp": 1776385154887
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 15 tool calls",
+    "context": "update claude cli nya ke  version  2.1.111 dan buatkan model routing",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read",
+      "Edit"
+    ],
+    "id": "mem-1776385354368-aavr",
+    "timestamp": 1776385354368
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 6 tool calls",
+    "context": "claude version nya gmn petruk udah version brp",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776385535974-xuad",
+    "timestamp": 1776385535974
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 13 tool calls",
+    "context": "soal model routing ini gua mau semua fleksible jadi ngedefine dr prompt yg dikasih. semar bisa aja model haiku kalo gua cuman sapa doang",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read",
+      "Edit"
+    ],
+    "id": "mem-1776385736190-n7rq",
+    "timestamp": 1776385736190
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 20 tool calls",
+    "context": "Rebase MR !546 di repo ide-phoenix (/root/repos/ide-phoenix) — ada conflict yang perlu di-resolve. Flow: 1) git fetch origin, 2) git checkout fix/add-static-path-ingress-uat, 3) git rebase origin/main, 4) untuk setiap conflict: baca kedua versi, resolve dengan logis (jangan asal pilih satu sisi), 5) git add file-yang-di-resolve, 6) git rebase --continue, ulangi sampai selesai, 7) git push --force-with-lease. Laporkan file yang conflict dan bagaimana mereka di-resolve.",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776392620948-wxhr",
+    "timestamp": 1776392620948
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 2 tool calls",
+    "context": "petruk kasih gua top 3 news dunia 24 jam terakhir",
+    "outcome": "success",
+    "tags": [
+      "ToolSearch",
+      "WebSearch"
+    ],
+    "id": "mem-1776394378230-3l0g",
+    "timestamp": 1776394378230
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 5 tool calls",
+    "context": "cek PR requires over limi delivery deh",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776399295229-rqr1",
+    "timestamp": 1776399295229
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "yang PR 544 ada kontroversi terkait 100 / 101 kann?",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776399347231-nzfy",
+    "timestamp": 1776399347231
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 12 tool calls",
+    "context": "nah yg bener yg 101",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "Read",
+      "Edit"
+    ],
+    "id": "mem-1776399687440-hf73",
+    "timestamp": 1776399687440
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 4 tool calls",
+    "context": "semar lagi ngapain ya",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776409544230-7z6e",
+    "timestamp": 1776409544230
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 7 tool calls",
+    "context": "Rebase MR !548 di repo ide-phoenix (/root/repos/ide-phoenix) — ada conflict yang perlu di-resolve. Flow: 1) git fetch origin, 2) git checkout feat/npwp-inline-edit-document-list-v2, 3) git rebase origin/main, 4) untuk setiap conflict: baca kedua versi, resolve dengan logis (jangan asal pilih satu sisi), 5) git add file-yang-di-resolve, 6) git rebase --continue, ulangi sampai selesai, 7) git push --force-with-lease. Laporkan file yang conflict dan bagaimana mereka di-resolve.",
+    "outcome": "success",
+    "tags": [
+      "Bash",
+      "TodoWrite"
+    ],
+    "id": "mem-1776425477053-s0ih",
+    "timestamp": 1776425477053
+  },
+  {
+    "minionId": "petruk",
+    "type": "episodic",
+    "content": "Completed task with 6 tool calls",
+    "context": "User minta top 3 berita Indonesia 24 jam terakhir. Cari berita terbaru dari sumber valid (detik, kompas, cnnindonesia, dll) via web search atau browser. Sajikan dengan gaya Petruk: satir, tajam, tapi ada isinya. Format: nomor, judul, satu-dua kalimat komentar ala Petruk.",
+    "outcome": "success",
+    "tags": [
+      "ToolSearch",
+      "WebSearch"
+    ],
+    "id": "mem-1776574229918-d037",
+    "timestamp": 1776574229918
   }
 ]

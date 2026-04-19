@@ -5,9 +5,6 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
-// rebrowser-patches must be applied as a CLI step (postinstall), not imported at runtime.
-// Run: npx rebrowser-patches patch --packageName playwright-core
-
 chromium.use(StealthPlugin());
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -180,8 +177,7 @@ async function executeAction(page: Page, action: BrowserAction): Promise<Browser
       case "press": {
         if (!action.value) return { success: false, error: "value (key) required" };
         if (action.selector) {
-          await page.locator(action.selector).waitFor({ timeout });
-          await page.locator(action.selector).press(action.value);
+          await page.press(action.selector, action.value, { timeout });
         } else {
           await page.keyboard.press(action.value);
         }
@@ -196,16 +192,14 @@ async function executeAction(page: Page, action: BrowserAction): Promise<Browser
 
       case "click": {
         if (!action.selector) return { success: false, error: "selector required" };
-        await page.locator(action.selector).first().waitFor({ timeout });
-        await page.locator(action.selector).first().click();
+        await page.click(action.selector, { timeout });
         return { success: true };
       }
 
       case "fill": {
         if (!action.selector) return { success: false, error: "selector required" };
         if (action.value === undefined) return { success: false, error: "value required" };
-        await page.locator(action.selector).first().waitFor({ timeout });
-        await page.locator(action.selector).first().fill(action.value);
+        await page.fill(action.selector, action.value, { timeout });
         return { success: true };
       }
 

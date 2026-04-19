@@ -85,5 +85,54 @@
     ],
     "id": "mem-1775895209570-4es6",
     "timestamp": 1775895209570
+  },
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 4 tool calls",
+    "context": "Kirim pesan ke user (chatId: 8201379069): \"Nak, ini test notif dari Semar. Masuk ga?\"",
+    "outcome": "success",
+    "tags": [
+      "Grep",
+      "Bash"
+    ],
+    "id": "mem-1776068729896-7mv3",
+    "timestamp": 1776068729896
+  },
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "Kirim pesan ke chatId 8201379069: \"Test notif kedua, nak. Masuk ga?\"",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776068802165-7eqv",
+    "timestamp": 1776068802165
+  },
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 1 tool calls",
+    "context": "Kirim pesan ke chatId 8201379069: \"Test 3, nak.\"",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776068863054-fg6g",
+    "timestamp": 1776068863054
+  },
+  {
+    "minionId": "bagong",
+    "type": "episodic",
+    "content": "Completed task with 17 tool calls",
+    "context": "Rebase MR !549 di repo ide-phoenix (/root/repos/ide-phoenix) — ada conflict yang perlu di-resolve. Flow: 1) git fetch origin, 2) git checkout s68/phb-3256/msisdn-inline-usage-group-name, 3) git rebase origin/main, 4) untuk setiap conflict: baca kedua versi, resolve dengan logis (jangan asal pilih satu sisi), 5) git add file-yang-di-resolve, 6) git rebase --continue, ulangi sampai selesai, 7) git push --force-with-lease. Laporkan file yang conflict dan bagaimana mereka di-resolve.",
+    "outcome": "success",
+    "tags": [
+      "Bash"
+    ],
+    "id": "mem-1776392641236-f0rb",
+    "timestamp": 1776392641236
   }
 ]

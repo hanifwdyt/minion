@@ -25,7 +25,14 @@ const PRAYER_NAMES: Record<string, string> = {
 
 // ── Types ─────────────────────────────────────────────────────
 
-export interface MessageJob {
+// Shared tracking fields — updated after every execution
+export interface JobTracking {
+  lastRunAt?: string;   // ISO timestamp of last fire
+  lastStatus?: "ok" | "error" | "empty"; // empty = Claude returned nothing
+  lastError?: string;   // error message if lastStatus === "error"
+}
+
+export interface MessageJob extends JobTracking {
   id: string;
   type: "message";
   chatId: number;
@@ -37,7 +44,7 @@ export interface MessageJob {
   active: boolean;
 }
 
-export interface ClaudeTaskJob {
+export interface ClaudeTaskJob extends JobTracking {
   id: string;
   type: "claude_task";
   chatId: number;
@@ -49,7 +56,7 @@ export interface ClaudeTaskJob {
   active: boolean;
 }
 
-export interface PrayerJob {
+export interface PrayerJob extends JobTracking {
   id: string;
   type: "prayer";
   chatId: number;
@@ -99,12 +106,13 @@ async function runClaudeTask(taskPrompt: string): Promise<string> {
     headers: {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      "anthropic-beta": "prompt-caching-2024-07-31",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       model: CLAUDE_MODEL,
       max_tokens: 1024,
-      system: "Kamu adalah Semar, asisten pribadi yang bijak. Jawab dengan ringkas, padat, dan informatif. Gunakan bahasa Indonesia yang natural. Format yang rapi — gunakan bold, bullet points jika perlu.",
+      system: [{ type: "text", text: "Kamu adalah Semar, asisten pribadi yang bijak. Jawab dengan ringkas, padat, dan informatif. Gunakan bahasa Indonesia yang natural. Format yang rapi — gunakan bold, bullet points jika perlu.", cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: taskPrompt }],
     }),
   });
@@ -165,12 +173,13 @@ export async function parseJobIntent(text: string): Promise<ParsedJob | null> {
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 256,
-        system: PARSE_SYSTEM,
+        system: [{ type: "text", text: PARSE_SYSTEM, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: text }],
       }),
     });
@@ -203,6 +212,7 @@ interface DreamReport {
   ringkasan: string;
   memory_insights: string[];
   top_events: string[];
+  aksi: Array<{ prompt: string; workdir: string }>;
 }
 
 const MEMORY_DIR = resolve("/root/.claude/projects/-root-minion/memory");
@@ -267,16 +277,29 @@ Output HANYA JSON valid — tidak ada teks lain:
   "refleksi": ["poin 1", "poin 2", "poin 3"],
   "ide_fitur": ["ide 1", "ide 2", "ide 3"],
   "memory_insights": ["insight layak disimpan jangka panjang 1", "insight 2", "insight 3"],
-  "top_events": ["event paling signifikan 1", "event 2"]
-}`;
+  "top_events": ["event paling signifikan 1", "event 2"],
+  "aksi": [
+    {
+      "prompt": "instruksi konkret yang bisa langsung dieksekusi Claude Code — harus self-contained, spesifik, dan actionable. Contoh: 'Update knowledge file data/knowledge/gitlab-workflow.md — tambahkan section troubleshooting untuk error 401'. Bukan observasi, bukan saran — perintah eksekusi.",
+      "workdir": "/root/minion"
+    }
+  ]
+}
+
+Aturan untuk field aksi:
+- Isi HANYA jika ada sesuatu yang konkret bisa diperbaiki/diupdate malam ini tanpa approval user
+- Contoh valid: update knowledge file, update soul/config, fix typo di docs internal, clean up data stale
+- Contoh TIDAK valid: "fix bug di MR" (butuh context), "improve VPN" (terlalu abstrak), "hubungi user" (butuh approval)
+- Maksimal 3 aksi. Kalau tidak ada yang jelas bisa dikerjakan: aksi = []
+- workdir selalu "/root/minion" kecuali ada repo spesifik yang disebutkan dalam traces`;
 
   const res = await fetch(ANTHROPIC_API, {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
     body: JSON.stringify({
       model: CLAUDE_MODEL,
-      max_tokens: 1200,
-      system: "Kamu adalah Semar dalam fase NREM — memilah mana yang penting untuk diingat jangka panjang. Jawab HANYA JSON valid.",
+      max_tokens: 1800,
+      system: "Kamu adalah Semar dalam fase NREM — memilah mana yang penting untuk diingat jangka panjang, dan mengidentifikasi aksi konkret yang bisa dilakukan mandiri malam ini. Jawab HANYA JSON valid.",
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -346,10 +369,10 @@ function writeMemoryConsolidation(report: DreamReport, dateStr: string): void {
   console.log(`[JobManager] NREM memory written: ${fileName}`);
 }
 
-function formatDreamReport(raw: string): string {
+function formatDreamReport(raw: string, dispatchedAksi: string[] = []): string {
   try {
     const report = JSON.parse(raw) as DreamReport;
-    return [
+    const lines = [
       "☀️ *Selamat pagi, nak.*",
       "",
       `_Semalam gue bermimpi... ${report.ringkasan || "hari yang padat."}_`,
@@ -362,7 +385,14 @@ function formatDreamReport(raw: string): string {
       "",
       "🧠 *Yang Gue Simpan ke Memory (NREM)*",
       ...(report.memory_insights || []).map(m => `• ${m}`),
-    ].join("\n");
+    ];
+
+    if (dispatchedAksi.length > 0) {
+      lines.push("", "🔧 *Yang Udah Gue Kerjain Semalam*");
+      dispatchedAksi.forEach((a, i) => lines.push(`${i + 1}. ${a.slice(0, 120)}`));
+    }
+
+    return lines.join("\n");
   } catch {
     return "☀️ Selamat pagi, nak. Semalam gue bermimpi — tapi mimpinya terlalu abstrak untuk diceritakan. 😅";
   }
@@ -371,14 +401,18 @@ function formatDreamReport(raw: string): string {
 
 // ── JobManager ────────────────────────────────────────────────
 
+type RunTaskCallback = (minionId: string, prompt: string, workdir: string) => void;
+
 export class JobManager {
   private jobs: Map<string, ScheduledJob> = new Map();
   private cronTasks: Map<string, ScheduledTask> = new Map();
   private prayerTimers: Map<string, NodeJS.Timeout[]> = new Map();
   private send: SendCallback;
+  private runTask: RunTaskCallback | null = null;
 
-  constructor(send: SendCallback) {
+  constructor(send: SendCallback, runTask?: RunTaskCallback) {
     this.send = send;
+    this.runTask = runTask || null;
   }
 
   /** Load persisted jobs and reschedule all active ones */
@@ -465,6 +499,7 @@ export class JobManager {
     // NREM cron: 23:05 WIB — analyze traces, consolidate memory (hippocampus → neocortex)
     const dreamTask = cron.schedule("5 23 * * *", async () => {
       console.log("[JobManager] NREM starting — analyzing 24h traces...");
+      const dispatchedAksi: string[] = [];
       try {
         const traces = readRecentTraces(24);
         const raw = await runDreamAnalysis(traces);
@@ -474,9 +509,25 @@ export class JobManager {
           const report = JSON.parse(raw) as DreamReport;
           const dateStr = new Date().toISOString().slice(0, 10);
           writeMemoryConsolidation(report, dateStr);
-        } catch { /* continue even if memory write fails */ }
 
-        writeFileSync(DREAM_REPORT_PATH, JSON.stringify({ generatedAt: new Date().toISOString(), raw, traces: traces.length }, null, 2));
+          // Autonomous refleksi execution — dispatch aksi konkret tanpa approval user
+          if (this.runTask && Array.isArray(report.aksi) && report.aksi.length > 0) {
+            for (const aksi of report.aksi.slice(0, 3)) {
+              if (aksi.prompt && typeof aksi.prompt === "string") {
+                console.log(`[JobManager] NREM dispatching aksi: ${aksi.prompt.slice(0, 80)}...`);
+                this.runTask("semar", aksi.prompt, aksi.workdir || "/root/minion");
+                dispatchedAksi.push(aksi.prompt);
+              }
+            }
+          }
+        } catch { /* continue even if memory write or dispatch fails */ }
+
+        writeFileSync(DREAM_REPORT_PATH, JSON.stringify({
+          generatedAt: new Date().toISOString(),
+          raw,
+          traces: traces.length,
+          dispatchedAksi,
+        }, null, 2));
         console.log("[JobManager] NREM complete — dream report saved.");
       } catch (e) {
         console.error("[JobManager] Dream analysis failed:", e);
@@ -488,8 +539,8 @@ export class JobManager {
       console.log("[JobManager] Wake mode — sending morning dream report...");
       try {
         if (!existsSync(DREAM_REPORT_PATH)) return;
-        const saved = JSON.parse(readFileSync(DREAM_REPORT_PATH, "utf-8")) as { raw: string };
-        const msg = formatDreamReport(saved.raw);
+        const saved = JSON.parse(readFileSync(DREAM_REPORT_PATH, "utf-8")) as { raw: string; dispatchedAksi?: string[] };
+        const msg = formatDreamReport(saved.raw, saved.dispatchedAksi || []);
         this.send(job.chatId, msg);
       } catch (e) {
         console.error("[JobManager] Wake send failed:", e);
@@ -514,14 +565,24 @@ export class JobManager {
     this.cronTasks.set(job.id, dailyTask);
   }
 
-  private async _schedulePrayerDay(job: PrayerJob) {
+  private async _schedulePrayerDay(job: PrayerJob, retryCount = 0) {
     // Clear existing prayer timers for this job
     const existing = this.prayerTimers.get(job.id);
     if (existing) { existing.forEach(clearTimeout); }
 
     const times = await fetchPrayerTimes(job.location);
     if (!times) {
-      console.error(`[JobManager] Failed to fetch prayer times for ${job.location}`);
+      console.error(`[JobManager] Failed to fetch prayer times for ${job.location} (attempt ${retryCount + 1})`);
+      if (retryCount < 2) {
+        // Retry after 30 minutes (max 2 retries)
+        const retryTimer = setTimeout(() => this._schedulePrayerDay(job, retryCount + 1), 30 * 60 * 1000);
+        this.prayerTimers.set(job.id, [retryTimer]);
+        if (retryCount === 0) {
+          this.send(job.chatId, `⚠️ Gagal ambil jadwal sholat ${job.location} hari ini. Gue coba lagi dalam 30 menit, nak.`);
+        }
+      } else {
+        this.send(job.chatId, `❌ Jadwal sholat ${job.location} tidak bisa diambil setelah 3 percobaan. Cek koneksi atau coba restart.\n<code>id: ${job.id}</code>`);
+      }
       return;
     }
 
@@ -539,34 +600,67 @@ export class JobManager {
       target.setUTCHours(h, m, 0, 0);
       const targetMs = target.getTime() - JAKARTA_OFFSET_MS;
 
-      // Only schedule if in the future
-      if (targetMs <= now) continue;
+      // Only schedule if in the future (with 60s buffer to avoid firing stale timers on restart)
+      if (targetMs <= now + 60_000) continue;
 
       const delay = targetMs - now;
       const prayerName = PRAYER_NAMES[key] || key;
       const timer = setTimeout(() => {
-        this.send(job.chatId, `🕌 Waktunya sholat *${prayerName}*, nak.\n_${timeStr} WIB_`);
+        this.send(job.chatId, `🕌 Waktunya sholat *${prayerName}*, nak. _${timeStr} WIB_\n\n_Berhenti sejenak, luruskan niat._ 🤲`);
       }, delay);
 
       timers.push(timer);
     }
 
     this.prayerTimers.set(job.id, timers);
-    console.log(`[JobManager] Scheduled ${timers.length} prayer times for ${job.location}`);
+
+    const scheduledNames = Object.entries(times)
+      .filter(([key, timeStr]) => {
+        const [h, m] = timeStr.split(":").map(Number);
+        const jakartaNow = new Date(now + JAKARTA_OFFSET_MS);
+        const target = new Date(jakartaNow);
+        target.setUTCHours(h, m, 0, 0);
+        return (target.getTime() - JAKARTA_OFFSET_MS) > now + 60_000;
+      })
+      .map(([key, t]) => `${PRAYER_NAMES[key] || key} ${t}`)
+      .join(", ");
+
+    console.log(`[JobManager] Prayer times loaded for ${job.location}: ${scheduledNames || "none remaining today"}`);
   }
 
   private async _execute(job: ScheduledJob) {
+    const now = new Date().toISOString();
     try {
       if (job.type === "message") {
-        this.send(job.chatId, job.message);
+        this.send(job.chatId, (job as MessageJob).message);
+        this._track(job, "ok", now);
       } else if (job.type === "claude_task") {
-        const result = await runClaudeTask(job.taskPrompt);
-        if (result) this.send(job.chatId, result);
+        const result = await runClaudeTask((job as ClaudeTaskJob).taskPrompt);
+        if (result) {
+          this.send(job.chatId, result);
+          this._track(job, "ok", now);
+        } else {
+          this._track(job, "empty", now, "Claude returned empty response");
+          this.send(job.chatId, `⚠️ Job *${(job as ClaudeTaskJob).label}* gagal — Claude tidak menghasilkan konten.\n<code>id: ${job.id}</code>`);
+        }
       }
-      // dream jobs are handled by their own crons, not _execute
+      // dream jobs handled by their own crons
     } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
       console.error(`[JobManager] Job ${job.id} execution failed:`, e);
+      this._track(job, "error", now, errMsg);
+      this.send(job.chatId, `❌ Job *${(job as ClaudeTaskJob | MessageJob).label}* error:\n<code>${errMsg}</code>\n<code>id: ${job.id}</code>`);
     }
+  }
+
+  /** Update tracking fields and persist */
+  private _track(job: ScheduledJob, status: "ok" | "error" | "empty", runAt: string, error?: string) {
+    const tracked = job as ScheduledJob & JobTracking;
+    tracked.lastRunAt = runAt;
+    tracked.lastStatus = status;
+    tracked.lastError = error;
+    this.jobs.set(job.id, tracked);
+    this._persist();
   }
 
   private _persist() {
@@ -584,4 +678,40 @@ export function formatJobConfirmation(job: ScheduledJob): string {
   const j = job as MessageJob | ClaudeTaskJob;
   const typeIcon = job.type === "claude_task" ? "🤖" : "💬";
   return `✅ Job set!\n${typeIcon} <b>${j.label}</b>\n🔁 ${j.cronLabel}\n<code>id: ${job.id}</code>`;
+}
+
+export function formatJobList(jobs: ScheduledJob[]): string {
+  if (jobs.length === 0) return "Tidak ada job aktif.";
+
+  const lines: string[] = ["📋 <b>Job Aktif</b>\n"];
+
+  for (const job of jobs) {
+    const tracked = job as ScheduledJob & JobTracking;
+
+    let icon = "💬";
+    let desc = "";
+    if (job.type === "claude_task") { icon = "🤖"; desc = (job as ClaudeTaskJob).cronLabel; }
+    else if (job.type === "prayer") { icon = "🕌"; desc = `Sholat 5 waktu — ${(job as PrayerJob).location}`; }
+    else if (job.type === "dream") { icon = "🌙"; desc = "NREM 23:05, wake 05:05"; }
+    else if (job.type === "message") { desc = (job as MessageJob).cronLabel; }
+
+    const label = (job as MessageJob | ClaudeTaskJob).label || job.type;
+
+    let statusLine = "";
+    if (tracked.lastRunAt) {
+      const wib = new Date(new Date(tracked.lastRunAt).getTime() + JAKARTA_OFFSET_MS);
+      const dateStr = wib.toISOString().replace("T", " ").slice(0, 16) + " WIB";
+      const statusIcon = tracked.lastStatus === "ok" ? "✅" : tracked.lastStatus === "empty" ? "⚠️" : "❌";
+      statusLine = `\n   ${statusIcon} Terakhir: ${dateStr}`;
+      if (tracked.lastStatus === "error" && tracked.lastError) {
+        statusLine += `\n   <i>${tracked.lastError.slice(0, 80)}</i>`;
+      }
+    } else {
+      statusLine = "\n   ⏳ Belum pernah jalan";
+    }
+
+    lines.push(`${icon} <b>${label}</b>\n   ${desc}${statusLine}\n   <code>${job.id}</code>`);
+  }
+
+  return lines.join("\n\n");
 }
